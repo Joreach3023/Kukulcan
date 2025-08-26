@@ -19,6 +19,7 @@ struct CombatView: View {
             let p2 = PlayerState(name: "IA",  deck: StarterFactory.randomDeck())
             _engine = StateObject(wrappedValue: GameEngine(p1: p1, p2: p2))
         }
+        .frame(maxWidth: .infinity)
     }
 
     // Sélections légères pour actions
