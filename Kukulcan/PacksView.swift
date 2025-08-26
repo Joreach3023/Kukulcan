@@ -74,18 +74,10 @@ struct PacksView: View {
 
                 Spacer()
 
-                HStack {
-                    Text("Cartes possédées : \(collection.owned.count)")
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                    Spacer()
-                    NavigationLink {
-                        CollectionView()
-                    } label: {
-                        Label("Voir la collection", systemImage: "square.grid.2x2")
-                    }
-                }
-                .padding(.horizontal)
+                Text("Cartes possédées : \(collection.owned.count)")
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .padding(.horizontal)
             }
             .toolbar(.hidden, for: .navigationBar)
             .toolbar(.visible, for: .tabBar)
