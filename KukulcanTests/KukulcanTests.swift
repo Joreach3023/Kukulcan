@@ -67,4 +67,24 @@ struct KukulcanTests {
         #expect(inst?.currentHP == 2)
     }
 
+    /// Decks should respect copy limits: max 3 per card, 1 for gods.
+    @Test func deckCopyLimits() {
+        let c1 = Card(name: "Soldat", type: .common, rarity: .common,
+                      imageName: "soldat", attack: 1, health: 1, effect: "")
+        let c2 = Card(name: "Soldat", type: .common, rarity: .common,
+                      imageName: "soldat", attack: 1, health: 1, effect: "")
+        let c3 = Card(name: "Soldat", type: .common, rarity: .common,
+                      imageName: "soldat", attack: 1, health: 1, effect: "")
+        let c4 = Card(name: "Soldat", type: .common, rarity: .common,
+                      imageName: "soldat", attack: 1, health: 1, effect: "")
+        let g1 = Card(name: "Kinich", type: .god, rarity: .legendary,
+                      imageName: "kinich", attack: 5, health: 5, bloodCost: 7, effect: "")
+        let g2 = Card(name: "Kinich", type: .god, rarity: .legendary,
+                      imageName: "kinich", attack: 5, health: 5, bloodCost: 7, effect: "")
+
+        #expect(Deck(name: "ok", cards: [c1, c2, c3]).isValid())
+        #expect(!Deck(name: "too many", cards: [c1, c2, c3, c4]).isValid())
+        #expect(!Deck(name: "gods", cards: [g1, g2]).isValid())
+        #expect(Deck(name: "one god", cards: [g1, c1]).isValid())
+    }
 }

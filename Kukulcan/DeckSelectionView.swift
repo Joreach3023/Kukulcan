@@ -56,6 +56,13 @@ struct DeckSelectionView: View {
                 .padding()
             }
             .navigationTitle("Choisir un deck")
+            .toolbar {
+                NavigationLink {
+                    DecksView()
+                } label: {
+                    Label("Decks", systemImage: "folder")
+                }
+            }
             .navigationDestination(isPresented: $startCombat) {
                 if let deck = selectedDeck, let lvl = selectedLevel {
                     CombatView(

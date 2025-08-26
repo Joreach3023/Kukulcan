@@ -20,9 +20,13 @@ struct DeckEditorView: View {
             Section("Cartes (\(selection.count)/10)") {
                 ForEach(collection.ownedPlayable) { card in
                     Button {
+                        let limit = card.type == .god ? 1 : 3
+                        let copies = collection.ownedPlayable.filter {
+                            $0.name == card.name && selection.contains($0.id)
+                        }.count
                         if selection.contains(card.id) {
                             selection.remove(card.id)
-                        } else if selection.count < 10 {
+                        } else if selection.count < 10 && copies < limit {
                             selection.insert(card.id)
                         }
                     } label: {
@@ -34,7 +38,13 @@ struct DeckEditorView: View {
                             }
                         }
                     }
-                    .disabled(!selection.contains(card.id) && selection.count >= 10)
+                    .disabled(
+                        !selection.contains(card.id) &&
+                        (selection.count >= 10 ||
+                         collection.ownedPlayable.filter {
+                            $0.name == card.name && selection.contains($0.id)
+                         }.count >= (card.type == .god ? 1 : 3))
+                    )
                 }
             }
         }
