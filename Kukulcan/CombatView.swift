@@ -9,7 +9,7 @@ struct CombatView: View {
             _engine = StateObject(wrappedValue: e)
         } else {
             let p1 = PlayerState(name: "Toi", deck: StarterFactory.playerDeck())
-            let p2 = PlayerState(name: "IA",  deck: StarterFactory.playerDeck())
+            let p2 = PlayerState(name: "IA",  deck: StarterFactory.randomDeck())
             _engine = StateObject(wrappedValue: GameEngine(p1: p1, p2: p2))
         }
     }
@@ -122,6 +122,12 @@ struct CombatView: View {
                     // Carte en jeu
                     ZStack(alignment: .topTrailing) {
                         slotView(for: inst?.base, hp: inst?.currentHP)
+                            .dropDestination(for: Card.self) { items, _ in
+                                guard let card = items.first,
+                                      let idx = engine.current.hand.firstIndex(where: { $0.id == card.id }) else { return false }
+                                engine.playCommonToBoard(handIndex: idx, slot: i)
+                                return true
+                            }
                             .overlay(
                                 VStack(spacing: 6) {
                                     // Attaquer depuis ce slot
@@ -209,6 +215,7 @@ struct CombatView: View {
                     ForEach(engine.current.hand.indices, id: \.self) { idx in
                         let c = engine.current.hand[idx]
                         CardView(card: c, faceUp: true, width: 120) {}
+                            .draggable(c)
                             .overlay(alignment: .bottom) {
                                 actionButtonsForHandCard(c, index: idx)
                                     .padding(.bottom, 6)
@@ -261,7 +268,13 @@ struct CombatView: View {
                     .lineLimit(2)
                 Spacer()
                 Button {
+                    engine.resetGame()
+                } label: {
+                    Label("Nouvelle partie", systemImage: "arrow.clockwise")
+                }
+                Button {
                     engine.endTurn()
+                    engine.performEasyAITurn()
                 } label: {
                     Label("Fin du tour", systemImage: "arrow.uturn.right.circle.fill")
                 }

@@ -336,6 +336,33 @@ final class GameEngine: ObservableObject {
     private func drawForCurrent(_ n: Int) {
         if currentPlayerIsP1 { p1.draw(n) } else { p2.draw(n) }
     }
+
+    // MARK: - IA facile
+    func performEasyAITurn() {
+        guard !currentPlayerIsP1 else { return }
+        if let slot = current.board.firstIndex(where: { $0 == nil }),
+           let idx = current.hand.firstIndex(where: { $0.type == .common }) {
+            playCommonToBoard(handIndex: idx, slot: slot)
+        }
+        for i in 0..<current.board.count {
+            if current.board[i] != nil {
+                attack(from: i, to: .boardSlot(i))
+            }
+        }
+        if current.godSlot != nil {
+            attack(from: -1, to: .player)
+        }
+        endTurn()
+    }
+
+    // MARK: - Réinitialisation
+    func resetGame() {
+        p1 = PlayerState(name: p1.name, deck: StarterFactory.playerDeck())
+        p2 = PlayerState(name: p2.name, deck: StarterFactory.randomDeck())
+        currentPlayerIsP1 = true
+        log.removeAll()
+        start()
+    }
 }
 
 // MARK: - Sample Decks (starter)
@@ -377,6 +404,10 @@ struct StarterFactory {
         d += [god("Kukulcan", atk: 7, hp: 8, el: .plant, img: "kukulcan", cost: 7,
                   lore: "Serpent à plumes, cyclone vivant des jungles oubliées.")]
         return d
+    }
+
+    static func randomDeck() -> [Card] {
+        CardsDB.battleDeck
     }
 }
 
