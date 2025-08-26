@@ -87,11 +87,7 @@ struct PacksView: View {
                 }
                 .padding(.horizontal)
             }
-            .navigationTitle("Accueil")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.visible, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbar(.hidden, for: .navigationBar)
             .toolbar(.visible, for: .tabBar)
             .background(
                 PacksBackdrop(closeUp: showOpening, bloodProgress: bloodProgress).ignoresSafeArea()
