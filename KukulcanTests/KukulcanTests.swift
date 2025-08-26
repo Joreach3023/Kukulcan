@@ -19,7 +19,7 @@ struct KukulcanTests {
     /// Vérifie que le rituel Couteau d'obsidienne est bien défaussé après utilisation.
     @Test func obsidianKnifeIsDiscarded() {
         var p1 = PlayerState(name: "P1")
-        var p2 = PlayerState(name: "P2")
+        let p2 = PlayerState(name: "P2")
         let ritual = Card(name: "Couteau d'obsidienne", type: .ritual, rarity: .rare,
                           imageName: "", ritual: .obsidianKnife, effect: "")
         let common = Card(name: "Soldat", type: .common, rarity: .common,
@@ -53,7 +53,7 @@ struct KukulcanTests {
     /// `Charme forestier` should grant +1 attack and +1 health to a targeted common.
     @Test func forestCharmBuffsStats() {
         var p1 = PlayerState(name: "P1")
-        var p2 = PlayerState(name: "P2")
+        let p2 = PlayerState(name: "P2")
         let ritual = Card(name: "Charme forestier", type: .ritual, rarity: .rare,
                           imageName: "", ritual: .forestCharm, effect: "")
         let common = Card(name: "Soldat", type: .common, rarity: .common,
@@ -65,6 +65,16 @@ struct KukulcanTests {
         let inst = engine.p1.board[0]
         #expect(inst?.currentAttack == 2)
         #expect(inst?.currentHP == 2)
+    }
+
+    /// `pendingBonusBlood` should reset to 0 at end of turn.
+    @Test func pendingBonusBloodResets() {
+        var p1 = PlayerState(name: "P1")
+        let p2 = PlayerState(name: "P2")
+        p1.pendingBonusBlood = 1
+        let engine = GameEngine(p1: p1, p2: p2)
+        engine.endTurn()
+        #expect(engine.p1.pendingBonusBlood == 0)
     }
 
     /// Decks should respect copy limits: max 3 per card, 1 for gods.

@@ -330,8 +330,14 @@ final class GameEngine: ObservableObject {
     }
 
     func endTurn() {
-        // reset visuel slot sacrifice
-        if currentPlayerIsP1 { p1.sacrificeSlot = nil } else { p2.sacrificeSlot = nil }
+        // reset visuel slot sacrifice et bonus de sang
+        if currentPlayerIsP1 {
+            p1.sacrificeSlot = nil
+            p1.pendingBonusBlood = 0
+        } else {
+            p2.sacrificeSlot = nil
+            p2.pendingBonusBlood = 0
+        }
         currentPlayerIsP1.toggle()
         log.append("—— Tour terminé. À \(activeName()) de jouer.")
         // pioche automatique
