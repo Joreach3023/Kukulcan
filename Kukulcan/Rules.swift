@@ -2,7 +2,6 @@ import Foundation
 
 // MARK: - Domain
 
-enum Element: String, Codable, CaseIterable { case plant }
 enum Rarity: String, Codable { case common, rare, epic, legendary }
 
 enum CardType: String, Codable { case common, ritual, god }
@@ -19,7 +18,6 @@ struct Card: Identifiable, Codable, Hashable {
     let id = UUID()
     let name: String
     let type: CardType
-    let element: Element
     let rarity: Rarity
     let imageName: String
 
@@ -35,7 +33,6 @@ struct Card: Identifiable, Codable, Hashable {
 
     init(name: String,
          type: CardType,
-         element: Element,
          rarity: Rarity,
          imageName: String,
          attack: Int = 0,
@@ -46,7 +43,6 @@ struct Card: Identifiable, Codable, Hashable {
          lore: String? = nil) {
         self.name = name
         self.type = type
-        self.element = element
         self.rarity = rarity
         self.imageName = imageName
         self.attack = attack
@@ -369,15 +365,15 @@ final class GameEngine: ObservableObject {
 
 struct StarterFactory {
     static func common(_ name: String, atk: Int, hp: Int, img: String, effect: String? = nil) -> Card {
-        Card(name: name, type: .common, element: .plant, rarity: .common, imageName: img,
+        Card(name: name, type: .common, rarity: .common, imageName: img,
              attack: atk, health: hp, effect: effect, lore: nil)
     }
     static func ritual(_ kind: RitualKind, name: String, img: String, effect: String) -> Card {
-        Card(name: name, type: .ritual, element: .plant, rarity: .rare, imageName: img,
+        Card(name: name, type: .ritual, rarity: .rare, imageName: img,
              ritual: kind, effect: effect)
     }
     static func god(_ name: String, atk: Int, hp: Int, img: String, cost: Int, lore: String) -> Card {
-        Card(name: name, type: .god, element: .plant, rarity: .legendary, imageName: img,
+        Card(name: name, type: .god, rarity: .legendary, imageName: img,
              attack: atk, health: hp, bloodCost: cost, effect: "Invocation : pouvoir divin.", lore: lore)
     }
 
