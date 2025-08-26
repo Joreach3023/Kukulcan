@@ -15,9 +15,20 @@ struct MainTabView: View {
                 DeckSelectionView()
                     .tabItem { Label("Combats", systemImage: "gamecontroller.fill") }
             } else {
-                Text("Crée un deck de 10 cartes pour combattre.")
+                NavigationStack {
+                    VStack(spacing: 16) {
+                        Text("Crée un deck de 10 cartes pour combattre.")
+                            .multilineTextAlignment(.center)
+                        NavigationLink {
+                            DecksView()
+                        } label: {
+                            Label("Créer un deck", systemImage: "plus")
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
                     .padding()
-                    .tabItem { Label("Combats", systemImage: "gamecontroller.fill") }
+                }
+                .tabItem { Label("Combats", systemImage: "gamecontroller.fill") }
             }
         }
         .tint(.orange)
