@@ -13,11 +13,6 @@ final class CollectionStore: ObservableObject {
 
     init() {
         load()
-        // Si première ouverture et collection vide, on peut donner 3 communes de départ (optionnel)
-        if owned.isEmpty {
-            let starters = Array(CardsDB.commons.shuffled().prefix(3))
-            owned.append(contentsOf: starters)
-        }
     }
 
     // MARK: - Packs
