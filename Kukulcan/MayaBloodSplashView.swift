@@ -13,7 +13,7 @@ struct MayaBloodSplashView: View {
                 .scaledToFill()
                 .ignoresSafeArea()
             
-            // Couche rouge qui recouvre progressivement l’eau
+            // Couche rouge qui recouvre progressivement le fond
             Rectangle()
                 .fill(
                     LinearGradient(

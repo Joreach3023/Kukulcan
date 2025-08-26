@@ -10,12 +10,9 @@ import Testing
 
 struct KukulcanTests {
 
-    /// Vérifie la logique pierre-feuille-ciseaux entre les éléments.
-    @Test func elementBeatsLogic() {
-        #expect(Element.fire.beats(.plant))
-        #expect(Element.water.beats(.fire))
-        #expect(Element.plant.beats(.water))
-        #expect(!Element.fire.beats(.water))
+    /// Vérifie que l’élément Plante possède un titre lisible.
+    @Test func plantElementHasTitle() {
+        #expect(Element.plant.title == "Plante")
     }
 
 }

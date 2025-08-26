@@ -195,7 +195,6 @@ struct CardDetailView: View {
             Spacer()
 
             HStack(spacing: 6) {
-                Image(systemName: elementIcon)
                 Text("\(card.attack)/\(card.health)")
                     .font(.headline.bold())
             }
@@ -231,13 +230,7 @@ struct CardDetailView: View {
         }
     }
 
-    private var elementIcon: String {
-        switch card.element {
-        case .fire:  return "flame.fill"
-        case .water: return "drop.fill"
-        case .plant: return "leaf.fill"
-        }
-    }
+    // Les éléments ne sont plus utilisés, on affiche uniquement les statistiques.
 }
 
 // Coins arrondis sélectifs

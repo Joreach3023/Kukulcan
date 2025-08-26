@@ -129,7 +129,6 @@ struct CardView: View {
 
             // Puissance
             HStack(spacing: 4) {
-                Image(systemName: elementIcon)
                 Text("\(card.attack)/\(card.health)")
                     .font(statFont)
             }
@@ -184,14 +183,6 @@ struct CardView: View {
             return LinearGradient(colors: [.orange, .red], startPoint: .topLeading, endPoint: .bottomTrailing)
         }
         return LinearGradient(colors: [.gray, .black.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing)
-    }
-
-    private var elementIcon: String {
-        switch card.element {
-        case .fire:  return "flame.fill"
-        case .water: return "drop.fill"
-        case .plant: return "leaf.fill"
-        }
     }
 
     private var cardTypeText: String {
