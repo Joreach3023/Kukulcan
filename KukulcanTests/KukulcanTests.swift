@@ -50,4 +50,21 @@ struct KukulcanTests {
         #expect(inst.id == decoded.id)
     }
 
+    /// `Charme forestier` should grant +1 attack and +1 health to a targeted common.
+    @Test func forestCharmBuffsStats() {
+        var p1 = PlayerState(name: "P1")
+        var p2 = PlayerState(name: "P2")
+        let ritual = Card(name: "Charme forestier", type: .ritual, rarity: .rare,
+                          imageName: "", ritual: .forestCharm, effect: "")
+        let common = Card(name: "Soldat", type: .common, rarity: .common,
+                          imageName: "soldat", attack: 1, health: 1, effect: "")
+        p1.hand = [ritual]
+        p1.board[0] = CardInstance(common)
+        let engine = GameEngine(p1: p1, p2: p2)
+        engine.playRitual(handIndex: 0, targetSlot: 0)
+        let inst = engine.p1.board[0]
+        #expect(inst?.currentAttack == 2)
+        #expect(inst?.currentHP == 2)
+    }
+
 }

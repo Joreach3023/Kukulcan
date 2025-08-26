@@ -70,11 +70,13 @@ struct CardInstance: Identifiable, Codable, Hashable {
     let id: UUID
     let base: Card
     var currentHP: Int
+    var currentAttack: Int
 
-    init(_ card: Card, id: UUID = UUID(), currentHP: Int? = nil) {
+    init(_ card: Card, id: UUID = UUID(), currentHP: Int? = nil, currentAttack: Int? = nil) {
         self.id = id
         self.base = card
         self.currentHP = currentHP ?? max(1, card.health)
+        self.currentAttack = currentAttack ?? card.attack
     }
 }
 
@@ -181,7 +183,7 @@ final class GameEngine: ObservableObject {
         switch kind {
         case .obsidianKnife:
             // Sacrifie une commune POSÉE (si targetSlot fourni et valide)
-            if let s = targetSlot, s >= 0, s < cp.board.count, var inst = cp.board[s] {
+            if let s = targetSlot, s >= 0, s < cp.board.count, let inst = cp.board[s] {
                 cp.board[s] = nil
                 let gain = 1 + cp.pendingBonusBlood
                 cp.blood += gain
@@ -206,6 +208,7 @@ final class GameEngine: ObservableObject {
         case .forestCharm:
             if let s = targetSlot, s >= 0, s < cp.board.count, var inst = cp.board[s] {
                 inst.currentHP += 1
+                inst.currentAttack += 1
                 // On remplace l’instance modifiée
                 cp.board[s] = inst
                 cp.discard.append(c)
@@ -280,14 +283,15 @@ final class GameEngine: ObservableObject {
 
         switch target {
         case .player:
-            defOwner.hp -= atker.base.attack
+            defOwner.hp -= atker.currentAttack
             if defOwner.hp < 0 { defOwner.hp = 0 }
-            log.append("\(activeName()) attaque directement → \(passiveName()) perd \(atker.base.attack) PV (\(defOwner.hp) restants).")
+            log.append("\(activeName()) attaque directement → \(passiveName()) perd \(atker.currentAttack) PV (\(defOwner.hp) restants).")
+            assignBackAttacker()
 
         case .god:
             guard var def = defOwner.godSlot else { return }
-            def.currentHP -= atker.base.attack
-            atker.currentHP -= def.base.attack
+            def.currentHP -= atker.currentAttack
+            atker.currentHP -= def.currentAttack
             if def.currentHP <= 0 { defOwner.discard.append(def.base); defOwner.godSlot = nil }
             if atker.currentHP <= 0 {
                 if isGod { atkOwner.discard.append(atker.base); atkOwner.godSlot = nil }
@@ -300,14 +304,15 @@ final class GameEngine: ObservableObject {
         case .boardSlot(let i):
             guard i >= 0, i < defOwner.board.count, var def = defOwner.board[i] else {
                 // pas de défenseur → attaque le joueur
-                defOwner.hp -= atker.base.attack
+                defOwner.hp -= atker.currentAttack
                 if defOwner.hp < 0 { defOwner.hp = 0 }
-                log.append("\(activeName()) trouve la voie libre et frappe \(passiveName()) pour \(atker.base.attack) PV.")
+                log.append("\(activeName()) trouve la voie libre et frappe \(passiveName()) pour \(atker.currentAttack) PV.")
+                assignBackAttacker()
                 break
             }
             // combat
-            def.currentHP -= atker.base.attack
-            atker.currentHP -= def.base.attack
+            def.currentHP -= atker.currentAttack
+            atker.currentHP -= def.currentAttack
 
             if def.currentHP <= 0 { defOwner.discard.append(def.base); defOwner.board[i] = nil }
             else { defOwner.board[i] = def }
