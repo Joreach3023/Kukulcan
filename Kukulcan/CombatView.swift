@@ -19,6 +19,7 @@ struct CombatView: View {
             let p2 = PlayerState(name: "IA",  deck: StarterFactory.randomDeck())
             _engine = StateObject(wrappedValue: GameEngine(p1: p1, p2: p2))
         }
+        .frame(maxWidth: .infinity)
     }
 
     // Sélections légères pour actions
@@ -42,10 +43,10 @@ struct CombatView: View {
     @State private var slotFrames: [Int: CGRect] = [:]
 
     // Tailles réduites pour mieux voir l’ensemble du plateau
-    private let slotCardWidth: CGFloat = 72
-    private let slotCardHeight: CGFloat = 100
-    private let deckCardWidth: CGFloat = 46
-    private let deckCardHeight: CGFloat = 64
+    private let slotCardWidth: CGFloat = 60
+    private let slotCardHeight: CGFloat = 84
+    private let deckCardWidth: CGFloat = 40
+    private let deckCardHeight: CGFloat = 56
 
     var body: some View {
         GeometryReader { _ in
@@ -79,7 +80,7 @@ struct CombatView: View {
                 }
 
                 if let idx = draggingCardIndex {
-                    CardView(card: engine.current.hand[idx], faceUp: true, width: 120)
+                    CardView(card: engine.current.hand[idx], faceUp: true, width: 100)
                         .position(dragPosition)
                         .shadow(radius: 8)
                         .zIndex(1)
@@ -195,9 +196,9 @@ struct CombatView: View {
                 Text("Pioche :").font(.caption)
                 ZStack {
                     if engine.opponent.deck.isEmpty {
-                        emptySlot(width: 46, height: 64)
+                        emptySlot(width: deckCardWidth, height: deckCardHeight)
                     } else {
-                        CardBackView().frame(width: 46, height: 64)
+                        CardBackView().frame(width: deckCardWidth, height: deckCardHeight)
                         Text("\(engine.opponent.deck.count)")
                             .font(.caption.bold())
                             .foregroundStyle(.white)
@@ -218,19 +219,20 @@ struct CombatView: View {
                     slotView(for: inst?.base, hp: inst?.currentHP)
                 }
             }
+            .frame(maxWidth: .infinity)
         }
     }
 
     private var opponentHandRow: some View {
         ZStack {
             ForEach(engine.opponent.hand.indices, id: \.self) { i in
-                CardBackView(width: 46)
+                CardBackView(width: deckCardWidth)
                     .rotation3DEffect(.degrees(15), axis: (x: 1, y: 0, z: 0))
                     .rotationEffect(.degrees(Double(i - engine.opponent.hand.count/2) * 8))
                     .offset(x: CGFloat(i - engine.opponent.hand.count/2) * 20)
             }
         }
-        .frame(height: 70)
+        .frame(maxWidth: .infinity, height: 70)
     }
 
     // MARK: - Board du joueur
@@ -273,7 +275,9 @@ struct CombatView: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity)
         }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Zones spéciales (Dieu / Sacrifice / Défausse)
@@ -345,8 +349,8 @@ struct CombatView: View {
                     }
                 }
             }
-            Spacer()
         }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Main du joueur
@@ -355,7 +359,7 @@ struct CombatView: View {
             HStack(spacing: 10) {
                 ForEach(engine.current.hand.indices, id: \.self) { idx in
                     let c = engine.current.hand[idx]
-                    CardView(card: c, faceUp: true, width: 120) {
+                    CardView(card: c, faceUp: true, width: 100) {
                         selectedCard = c
                     }
                     .matchedGeometryEffect(id: c.id, in: drawNamespace)
