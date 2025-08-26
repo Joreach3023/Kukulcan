@@ -10,8 +10,12 @@ import Testing
 
 struct KukulcanTests {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
+    /// Vérifie la logique pierre-feuille-ciseaux entre les éléments.
+    @Test func elementBeatsLogic() {
+        #expect(Element.fire.beats(.plant))
+        #expect(Element.water.beats(.fire))
+        #expect(Element.plant.beats(.water))
+        #expect(!Element.fire.beats(.water))
     }
 
 }
