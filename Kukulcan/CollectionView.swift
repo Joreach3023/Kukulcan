@@ -4,14 +4,12 @@ import SwiftUI
 // Agrégation des doublons (clé sans "power")
 private struct CardKey: Hashable {
     let name: String
-    let element: Element
     let imageName: String
     let rarity: Rarity
     let type: CardType
 
     init(_ c: Card) {
         name = c.name
-        element = c.element
         imageName = c.imageName
         rarity = c.rarity
         type = c.type

@@ -61,7 +61,6 @@ final class GameState: ObservableObject {
         // Retrouver la vraie carte dans la main (drag encodé/décodé)
         guard let idx = playerHand.firstIndex(where: {
             $0.name == card.name &&
-            $0.element == card.element &&
             $0.attack == card.attack &&
             $0.health == card.health &&
             $0.imageName == card.imageName &&
@@ -137,7 +136,6 @@ final class GameState: ObservableObject {
             Card(
                 name: "Kinich Ahau",
                 type: .god,
-                element: .plant,
                 rarity: .legendary,
                 imageName: "kinich_ahau",
                 attack: 6,
@@ -150,7 +148,6 @@ final class GameState: ObservableObject {
             Card(
                 name: "Buluc Chabtan",
                 type: .god,
-                element: .plant,
                 rarity: .legendary,
                 imageName: "buluc_chabtan",
                 attack: 4,
@@ -163,7 +160,6 @@ final class GameState: ObservableObject {
             Card(
                 name: "Chaac",
                 type: .god,
-                element: .plant,
                 rarity: .legendary,
                 imageName: "chaac",
                 attack: 6,
@@ -176,7 +172,6 @@ final class GameState: ObservableObject {
             Card(
                 name: "Ix Chel",
                 type: .god,
-                element: .plant,
                 rarity: .legendary,
                 imageName: "ix_chel",
                 attack: 4,
@@ -189,7 +184,6 @@ final class GameState: ObservableObject {
             Card(
                 name: "Kukulcan",
                 type: .god,
-                element: .plant,
                 rarity: .legendary,
                 imageName: "kukulcan",
                 attack: 5,
@@ -202,7 +196,6 @@ final class GameState: ObservableObject {
             Card(
                 name: "Itzamna",
                 type: .god,
-                element: .plant,
                 rarity: .legendary,
                 imageName: "itzamna",
                 attack: 3,

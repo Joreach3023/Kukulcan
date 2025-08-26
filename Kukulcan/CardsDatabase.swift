@@ -29,7 +29,6 @@ struct CardsDB {
         Card(
             name: name,
             type: .common,
-            element: .plant,
             rarity: .common,
             imageName: img,
             attack: atk,
@@ -52,7 +51,6 @@ struct CardsDB {
         Card(
             name: name,
             type: .ritual,
-            element: .plant, // élément arbitraire pour rituels
             rarity: rarity,
             imageName: img,
             attack: 0,
@@ -75,7 +73,6 @@ struct CardsDB {
         Card(
             name: name,
             type: .god,
-            element: .plant,
             rarity: .legendary,
             imageName: img,
             attack: atk,
