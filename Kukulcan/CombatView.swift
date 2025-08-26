@@ -86,7 +86,6 @@ struct CombatView: View {
                 }
             }
         }
-        .coordinateSpace(name: "combatArea")
         .onAppear {
             // Démarrer la partie si pas déjà fait
             if engine.p1.hand.isEmpty && engine.p2.hand.isEmpty {
@@ -152,6 +151,7 @@ struct CombatView: View {
                 dismiss()
             }
         }
+        .coordinateSpace(name: "combatArea")
     }
 
     // MARK: - Header (scores / sang)
@@ -364,11 +364,10 @@ struct CombatView: View {
                     .gesture(
                         DragGesture(minimumDistance: 0, coordinateSpace: .named("combatArea"))
                             .onChanged { value in
-                                guard value.translation.height < 0 else { return }
+                                dragPosition = value.location
                                 if draggingCardIndex == nil {
                                     draggingCardIndex = idx
                                 }
-                                dragPosition = value.location
                                 if let slot = slotFrames.first(where: { $0.value.contains(value.location) })?.key {
                                     if hoveredSlot != slot {
                                         hoveredSlot = slot
