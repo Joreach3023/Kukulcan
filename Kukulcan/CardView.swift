@@ -124,6 +124,8 @@ struct CardView: View {
             // Type
             Text(card.rarity == .legendary ? "DIEU" : cardTypeText)
                 .font(typeFont)
+                .lineLimit(1)
+                .minimumScaleFactor(0.2)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(Capsule().fill(typeChipBG))
                 .foregroundStyle(.white)
@@ -132,7 +134,7 @@ struct CardView: View {
             Text(card.name)
                 .font(nameFont)
                 .lineLimit(1)
-                .minimumScaleFactor(0.5)
+                .minimumScaleFactor(0.2)
                 .foregroundStyle(.white)
 
             Spacer()
@@ -141,6 +143,8 @@ struct CardView: View {
             HStack(spacing: 4) {
                 Text("\(card.attack)/\(card.health)")
                     .font(statFont)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.2)
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 8).padding(.vertical, 4)
@@ -156,7 +160,7 @@ struct CardView: View {
                 .font(effectFont)
                 .foregroundStyle(.white.opacity(0.95))
                 .lineLimit(1)
-                .minimumScaleFactor(0.5)
+                .minimumScaleFactor(0.2)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 10)
