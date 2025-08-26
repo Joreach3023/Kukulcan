@@ -142,7 +142,7 @@ struct CardView: View {
 
     private var footer: some View {
         HStack {
-            Text(card.effect ?? "")
+            Text(card.effect)
                 .font(effectFont)
                 .foregroundStyle(.white.opacity(0.95))
                 .lineLimit(1)

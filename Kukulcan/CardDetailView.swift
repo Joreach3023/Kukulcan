@@ -90,7 +90,7 @@ struct CardDetailView: View {
 
                             // Bandeau bas (texte d’effet)
                             HStack {
-                                Text(card.effect ?? "")
+                                Text(card.effect)
                                     .font(.footnote)
                                     .foregroundStyle(.white.opacity(0.95))
                                     .lineLimit(2)
