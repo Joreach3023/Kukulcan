@@ -70,6 +70,13 @@ struct CollectionView: View {
                 }
             }
             .navigationTitle("Collection")
+            .toolbar {
+                NavigationLink {
+                    DecksView()
+                } label: {
+                    Label("Decks", systemImage: "folder")
+                }
+            }
             // ⬇︎ Place le fond derrière tout le contenu de la stack
             .background(
                 CollectionBackground()
