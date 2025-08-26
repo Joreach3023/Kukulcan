@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct CombatView: View {
     // Fournis un engine depuis l’extérieur si tu veux (collection/IA), sinon starter par défaut
@@ -26,6 +27,7 @@ struct CombatView: View {
 
     @Namespace private var drawNamespace
     @State private var animatingCard: Card? = nil
+    @State private var showBloodRiver = false
 
     // Tailles réduites pour mieux voir l’ensemble du plateau
     private let slotCardWidth: CGFloat = 72
@@ -54,6 +56,12 @@ struct CombatView: View {
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
+
+            if showBloodRiver {
+                BloodRiverView()
+                    .transition(.move(edge: .top))
+                    .allowsHitTesting(false)
+            }
         }
         .onAppear {
             // Démarrer la partie si pas déjà fait
@@ -67,6 +75,15 @@ struct CombatView: View {
             withAnimation(.easeInOut(duration: 0.6)) { }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 animatingCard = nil
+            }
+        }
+        .onChange(of: engine.current.sacrificeSlot?.id) { _ in
+            guard engine.current.sacrificeSlot != nil else { return }
+            let generator = UIImpactFeedbackGenerator(style: .heavy)
+            generator.impactOccurred()
+            showBloodRiver = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                showBloodRiver = false
             }
         }
         .sheet(isPresented: $showTargetPickerForRitual) {
@@ -465,6 +482,26 @@ struct CombatView: View {
             }
             .padding()
         }
+    }
+}
+
+private struct BloodRiverView: View {
+    @State private var offsetY: CGFloat = -UIScreen.main.bounds.height
+
+    var body: some View {
+        GeometryReader { geo in
+            Rectangle()
+                .fill(LinearGradient(colors: [Color.red.opacity(0.8), Color.clear], startPoint: .top, endPoint: .bottom))
+                .frame(height: geo.size.height)
+                .offset(y: offsetY)
+                .onAppear {
+                    offsetY = -geo.size.height
+                    withAnimation(.easeInOut(duration: 0.7)) {
+                        offsetY = geo.size.height
+                    }
+                }
+        }
+        .ignoresSafeArea()
     }
 }
 
