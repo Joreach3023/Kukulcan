@@ -111,13 +111,11 @@ struct CombatView: View {
         }
         .sheet(isPresented: $showTargetPickerForRitual) {
             ritualTargetSheet
-                // Use a fraction-based detent to avoid requiring iOS 17's height API
-                .presentationDetents([.fraction(0.35)])
+                .presentationDetents([.height(280)])
         }
         .sheet(isPresented: $showAttackPicker) {
             attackTargetSheet
-                // Same workaround here – approximate desired height with a fraction
-                .presentationDetents([.fraction(0.45)])
+                .presentationDetents([.height(320)])
         }
         .navigationTitle("Combats")
         .navigationBarTitleDisplayMode(.inline)
