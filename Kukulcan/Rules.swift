@@ -24,7 +24,7 @@ enum RitualKind: String, Codable {
 
 /// Carte "statique" (modèle)
 struct Card: Identifiable, Codable, Hashable {
-    let id = UUID()
+    let id: UUID
     let name: String
     let type: CardType
     let rarity: Rarity
@@ -40,7 +40,8 @@ struct Card: Identifiable, Codable, Hashable {
     let effect: String    // texte synthétique à afficher sur la carte (footer)
     let lore: String?     // visible seulement en vue zoom
 
-    init(name: String,
+    init(id: UUID = UUID(),
+         name: String,
          type: CardType,
          rarity: Rarity,
          imageName: String,
@@ -50,6 +51,7 @@ struct Card: Identifiable, Codable, Hashable {
          bloodCost: Int = 0,
          effect: String,
          lore: String? = nil) {
+        self.id = id
         self.name = name
         self.type = type
         self.rarity = rarity
@@ -65,13 +67,14 @@ struct Card: Identifiable, Codable, Hashable {
 
 /// Instance vivante d’une carte sur le plateau (HP courant, etc.)
 struct CardInstance: Identifiable, Codable, Hashable {
-    let id = UUID()
+    let id: UUID
     let base: Card
     var currentHP: Int
 
-    init(_ card: Card) {
+    init(_ card: Card, id: UUID = UUID(), currentHP: Int? = nil) {
+        self.id = id
         self.base = card
-        self.currentHP = max(1, card.health)
+        self.currentHP = currentHP ?? max(1, card.health)
     }
 }
 

@@ -6,6 +6,7 @@
 //
 
 import Testing
+import Foundation
 @testable import Kukulcan
 
 struct KukulcanTests {
@@ -28,6 +29,25 @@ struct KukulcanTests {
         let engine = GameEngine(p1: p1, p2: p2)
         engine.playRitual(handIndex: 0, targetSlot: 0)
         #expect(engine.p1.discard.contains(where: { $0.id == ritual.id }))
+    }
+
+    /// `Card` should keep the same `id` after encoding and decoding.
+    @Test func cardIDIsStableThroughCoding() throws {
+        let card = Card(name: "Test", type: .common, rarity: .common,
+                        imageName: "test", attack: 1, health: 1, effect: "")
+        let data = try JSONEncoder().encode(card)
+        let decoded = try JSONDecoder().decode(Card.self, from: data)
+        #expect(card.id == decoded.id)
+    }
+
+    /// `CardInstance` should keep the same `id` after encoding and decoding.
+    @Test func cardInstanceIDIsStableThroughCoding() throws {
+        let card = Card(name: "Test", type: .common, rarity: .common,
+                        imageName: "test", attack: 1, health: 1, effect: "")
+        let inst = CardInstance(card)
+        let data = try JSONEncoder().encode(inst)
+        let decoded = try JSONDecoder().decode(CardInstance.self, from: data)
+        #expect(inst.id == decoded.id)
     }
 
 }
