@@ -22,6 +22,8 @@ struct CombatView: View {
     @State private var showAttackPicker = false
     @State private var attackFromSlot: Int? = nil  // -1 = dieu
 
+    @State private var selectedCard: Card? = nil
+
     var body: some View {
         ZStack {
             // Fond visuel du combat
@@ -41,11 +43,7 @@ struct CombatView: View {
                 // Zone Dieu + Sacrifice + Défausse
                 zonesRow
 
-                // Main du joueur
-                handStrip
-
-                // Log + actions de tour
-                footerControls
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
@@ -66,6 +64,18 @@ struct CombatView: View {
         }
         .navigationTitle("Combats")
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 8) {
+                footerControls
+                handStrip
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 4)
+            .background(.ultraThinMaterial)
+        }
+        .fullScreenCover(item: $selectedCard) { card in
+            CardDetailView(card: card) { selectedCard = nil }
+        }
     }
 
     // MARK: - Header (scores / sang)
@@ -181,9 +191,11 @@ struct CombatView: View {
                 Text("Sacrifice").font(.caption).foregroundStyle(.secondary)
                 // visuel tourné à 90° si présent
                 if let inst = engine.current.sacrificeSlot {
-                    CardView(card: inst.base, faceUp: true, width: 92)
-                        .rotationEffect(.degrees(90))
-                        .overlay(Text("+1 Sang").font(.caption2.bold()).padding(4).background(.black.opacity(0.6)).clipShape(Capsule()).foregroundStyle(.white), alignment: .bottom)
+                    CardView(card: inst.base, faceUp: true, width: 92) {
+                        selectedCard = inst.base
+                    }
+                    .rotationEffect(.degrees(90))
+                    .overlay(Text("+1 Sang").font(.caption2.bold()).padding(4).background(.black.opacity(0.6)).clipShape(Capsule()).foregroundStyle(.white), alignment: .bottom)
                 } else {
                     emptySlot(width: 92, height: 128)
                 }
@@ -214,12 +226,14 @@ struct CombatView: View {
                 HStack(spacing: 10) {
                     ForEach(engine.current.hand.indices, id: \.self) { idx in
                         let c = engine.current.hand[idx]
-                        CardView(card: c, faceUp: true, width: 120) {}
-                            .draggable(c)
-                            .overlay(alignment: .bottom) {
-                                actionButtonsForHandCard(c, index: idx)
-                                    .padding(.bottom, 6)
-                            }
+                        CardView(card: c, faceUp: true, width: 120) {
+                            selectedCard = c
+                        }
+                        .draggable(c)
+                        .overlay(alignment: .bottom) {
+                            actionButtonsForHandCard(c, index: idx)
+                                .padding(.bottom, 6)
+                        }
                     }
                 }
                 .padding(.horizontal, 4)
@@ -288,17 +302,19 @@ struct CombatView: View {
     private func slotView(for card: Card?, hp: Int?) -> some View {
         ZStack {
             if let card {
-                CardView(card: card, faceUp: true, width: 92) {}
-                    .overlay(alignment: .bottomTrailing) {
-                        if let hp {
-                            Text("\(hp)❤︎")
-                                .font(.caption2.bold())
-                                .padding(6)
-                                .background(.black.opacity(0.6))
-                                .foregroundStyle(.white)
-                                .clipShape(Capsule())
-                                .padding(4)
-                        }
+                CardView(card: card, faceUp: true, width: 92) {
+                    selectedCard = card
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if let hp {
+                        Text("\(hp)❤︎")
+                            .font(.caption2.bold())
+                            .padding(6)
+                            .background(.black.opacity(0.6))
+                            .foregroundStyle(.white)
+                            .clipShape(Capsule())
+                            .padding(4)
+                    }
                     }
             } else {
                 emptySlot(width: 92, height: 128)

@@ -7,6 +7,7 @@ struct PacksView: View {
     @State private var showOpening = false
     @State private var pulse = false
     @State private var bloodProgress: CGFloat = 0
+    @State private var selectedCard: Card? = nil
 
     var body: some View {
         NavigationStack {
@@ -59,9 +60,11 @@ struct PacksView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
                             ForEach(lastPulled) { card in
-                                CardView(card: card, faceUp: true, width: 120) { }
-                                    .transition(.scale.combined(with: .opacity))
-                                    .shadow(color: card.rarity.glow, radius: 10)
+                                CardView(card: card, faceUp: true, width: 120) {
+                                    selectedCard = card
+                                }
+                                .transition(.scale.combined(with: .opacity))
+                                .shadow(color: card.rarity.glow, radius: 10)
                             }
                         }
                         .padding(.horizontal)
@@ -103,6 +106,9 @@ struct PacksView: View {
             withAnimation(.easeInOut(duration: 0.6)) { bloodProgress = 0.0 }
         }) {
             PackOpeningView(cards: lastPulled) { showOpening = false }
+        }
+        .fullScreenCover(item: $selectedCard) { card in
+            CardDetailView(card: card) { selectedCard = nil }
         }
     }
 }
