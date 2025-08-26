@@ -10,7 +10,8 @@ struct CardBackView: View {
     var body: some View {
         let h = width * ratio
 
-        Image("LaunchLogo")
+        // Utilise l'image "MayaRiver" comme dos de carte
+        Image("MayaRiver")
             .resizable()
             .scaledToFill()
             .frame(width: width, height: h)
