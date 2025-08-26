@@ -1,31 +1,44 @@
 import SwiftUI
 
 struct CardBackView: View {
-    var width: CGFloat? = nil   // non utilisé, mais conservé pour matcher l’appel existant
+    /// Largeur de la carte. Utilisée pour calculer la hauteur et la taille du motif.
+    var width: CGFloat = 140
+    private let ratio: CGFloat = 1.5
 
     var body: some View {
-        ZStack {
-            // Dos neutre stylé
-            RoundedRectangle(cornerRadius: 12)
+        let h = width * ratio
+
+        return ZStack {
+            // Fond : dégradé sombre avec une bordure lumineuse subtile
+            RoundedRectangle(cornerRadius: 18)
                 .fill(
                     LinearGradient(
-                        colors: [.gray.opacity(0.6), .black.opacity(0.85)],
+                        colors: [.black, .gray.opacity(0.7)],
                         startPoint: .topLeading, endPoint: .bottomTrailing
                     )
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 18)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    .white.opacity(0.5),
+                                    .white.opacity(0.1)
+                                ],
+                                startPoint: .topLeading, endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 2
+                        )
                 )
 
-            // Petit symbole central (soleil)
+            // Symbole central (soleil)
             Image("kinich_ahau")
                 .resizable()
                 .scaledToFit()
-                .frame(width: (width ?? 140) * 0.5, height: (width ?? 140) * 0.5)
+                .frame(width: width * 0.5, height: width * 0.5)
+                .shadow(color: .white.opacity(0.4), radius: 6)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity) // s’étire dans le conteneur parent
-        .clipped()
+        .frame(width: width, height: h)
     }
 }
 
@@ -47,11 +60,19 @@ struct CardView: View {
     var body: some View {
         let h = width * ratio
 
-        // Contenu principal de la carte
-        let core = ZStack {
-            // Fond / cadre carte
+        // Contenu principal de la carte (face recto)
+        let front = ZStack {
+            // Fond / cadre carte teinté selon la rareté
             RoundedRectangle(cornerRadius: 18)
-                .fill(.ultraThinMaterial)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            card.rarity.glow.opacity(0.15),
+                            .black.opacity(0.85)
+                        ],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    )
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
                         .stroke(glowStroke, lineWidth: 2)
@@ -77,7 +98,7 @@ struct CardView: View {
                             .clipped()
                     } else {
                         // Fallback si l’asset est absent
-                        CardBackView()
+                        CardBackView(width: width)
                             .frame(width: width, height: h - topHeight - bottomHeight)
                     }
                 }
@@ -91,15 +112,29 @@ struct CardView: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 18))
         }
+
+        // Dos de carte
+        let back = CardBackView(width: width)
+
+        let cardStack = ZStack {
+            front
+                .opacity(faceUp ? 1 : 0)
+                .rotation3DEffect(.degrees(faceUp ? 0 : 180), axis: (x: 0, y: 1, z: 0))
+
+            back
+                .opacity(faceUp ? 0 : 1)
+                .rotation3DEffect(.degrees(faceUp ? -180 : 0), axis: (x: 0, y: 1, z: 0))
+        }
         .frame(width: width, height: h)
         .contentShape(RoundedRectangle(cornerRadius: 18))
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: faceUp)
 
         // N’applique le geste de tap que si un callback existe.
         return Group {
             if let onTap {
-                core.onTapGesture { onTap() }
+                cardStack.onTapGesture { onTap() }
             } else {
-                core
+                cardStack
             }
         }
     }
