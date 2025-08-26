@@ -117,14 +117,14 @@ struct CombatView: View {
         }
         .navigationTitle("Combats")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 8) {
                 footerControls
                 handStrip
             }
             .padding(.horizontal, 12)
-            // Ajout d’un padding supplémentaire pour dégager la barre de tabulation
-            .padding(.bottom, 64)
+            .padding(.bottom, 16)
             .background(.ultraThinMaterial)
         }
         .fullScreenCover(item: $selectedCard) { card in
@@ -169,6 +169,10 @@ struct CombatView: View {
     // MARK: - Opponent strip (aperçu board/dieu)
     private var opponentStrip: some View {
         VStack(spacing: 6) {
+            Text("Main adverse").font(.caption).foregroundStyle(.secondary)
+
+            opponentHandRow
+
             Text("Plateau adverse").font(.caption).foregroundStyle(.secondary)
 
             // Pioche adverse
@@ -200,6 +204,18 @@ struct CombatView: View {
                 }
             }
         }
+    }
+
+    private var opponentHandRow: some View {
+        ZStack {
+            ForEach(engine.opponent.hand.indices, id: \.self) { i in
+                CardBackView(width: 46)
+                    .rotation3DEffect(.degrees(15), axis: (x: 1, y: 0, z: 0))
+                    .rotationEffect(.degrees(Double(i - engine.opponent.hand.count/2) * 8))
+                    .offset(x: CGFloat(i - engine.opponent.hand.count/2) * 20)
+            }
+        }
+        .frame(height: 70)
     }
 
     // MARK: - Board du joueur
@@ -330,6 +346,7 @@ struct CombatView: View {
                             selectedCard = c
                         }
                         .matchedGeometryEffect(id: c.id, in: drawNamespace)
+                        .rotation3DEffect(.degrees(12), axis: (x: 1, y: 0, z: 0))
                         .opacity((animatingCard?.id == c.id || draggingCardIndex == idx) ? 0 : 1)
                         .gesture(
                             DragGesture(minimumDistance: 0, coordinateSpace: .named("combatArea"))
