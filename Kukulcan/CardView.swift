@@ -42,20 +42,17 @@ struct CardView: View {
         let front = ZStack {
             // Fond / cadre carte teinté selon la rareté
             RoundedRectangle(cornerRadius: 18)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            card.rarity.glow.opacity(0.15),
-                            .black.opacity(0.85)
-                        ],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    )
-                )
+                .fill(cardBackground)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
-                        .stroke(glowStroke, lineWidth: 2)
+                        .stroke(glowStroke, lineWidth: borderWidth)
                 )
-                .shadow(color: card.rarity.glow.opacity(0.6), radius: 10, x: 0, y: 6)
+                .shadow(
+                    color: glowColor.opacity(haloOpacity),
+                    radius: haloRadius,
+                    x: 0,
+                    y: haloYOffset
+                )
 
             // Illustration (avec place en haut et en bas)
             VStack(spacing: 0) {
@@ -166,16 +163,49 @@ struct CardView: View {
     }
 
     // MARK: - Styles
-
-    private var glowStroke: LinearGradient {
-        LinearGradient(
+    private var cardBackground: LinearGradient {
+        if card.rarity == .legendary {
+            return LinearGradient(
+                colors: [
+                    glowColor,
+                    glowColor.opacity(0.8)
+                ],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+        }
+        return LinearGradient(
             colors: [
-                card.rarity.glow.opacity(0.9),
-                card.rarity.glow.opacity(0.3)
+                glowColor.opacity(0.15),
+                .black.opacity(0.85)
             ],
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
     }
+
+    private var glowStroke: LinearGradient {
+        if card.rarity == .legendary {
+            return LinearGradient(
+                colors: [
+                    glowColor,
+                    glowColor.opacity(0.5)
+                ],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+        }
+        return LinearGradient(
+            colors: [
+                glowColor.opacity(0.9),
+                glowColor.opacity(0.3)
+            ],
+            startPoint: .topLeading, endPoint: .bottomTrailing
+        )
+    }
+
+    private var borderWidth: CGFloat { card.rarity == .legendary ? 4 : 2 }
+    private var haloRadius: CGFloat { card.rarity == .legendary ? 20 : 10 }
+    private var haloYOffset: CGFloat { card.rarity == .legendary ? 10 : 6 }
+    private var haloOpacity: Double { card.rarity == .legendary ? 1.0 : 0.6 }
+    private var glowColor: Color { card.rarity == .legendary ? .orange : card.rarity.glow }
 
     private var headerBG: LinearGradient {
         LinearGradient(
