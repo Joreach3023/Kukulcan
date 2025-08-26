@@ -17,7 +17,7 @@ let package = Package(
         .target(
             name: "Kukulcan",
             path: "Kukulcan",
-            sources: ["Placeholder.swift"]
+            sources: ["Placeholder.swift", "Rules.swift"]
         ),
         .testTarget(
             name: "KukulcanTests",
