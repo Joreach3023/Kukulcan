@@ -37,6 +37,12 @@ struct CardView: View {
 
     private let ratio: CGFloat = 1.5
 
+    // Tailles de police adaptatives
+    private var typeFont: Font { .system(size: width * 0.08, weight: .bold) }
+    private var nameFont: Font { .system(size: width * 0.12, weight: .semibold) }
+    private var statFont: Font { .system(size: width * 0.12, weight: .bold) }
+    private var effectFont: Font { .system(size: width * 0.10) }
+
     var body: some View {
         let h = width * ratio
 
@@ -106,16 +112,16 @@ struct CardView: View {
         HStack(spacing: 8) {
             // Type
             Text(card.rarity == .legendary ? "DIEU" : cardTypeText)
-                .font(.caption2.bold())
+                .font(typeFont)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(Capsule().fill(typeChipBG))
                 .foregroundStyle(.white)
 
             // Nom
             Text(card.name)
-                .font(.headline)
+                .font(nameFont)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.5)
                 .foregroundStyle(.white)
 
             Spacer()
@@ -124,7 +130,7 @@ struct CardView: View {
             HStack(spacing: 4) {
                 Image(systemName: elementIcon)
                 Text("\(card.attack)/\(card.health)")
-                    .font(.headline.bold())
+                    .font(statFont)
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 8).padding(.vertical, 4)
@@ -137,10 +143,10 @@ struct CardView: View {
     private var footer: some View {
         HStack {
             Text(card.effect ?? "")
-                .font(.footnote)
+                .font(effectFont)
                 .foregroundStyle(.white.opacity(0.95))
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.5)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 10)
