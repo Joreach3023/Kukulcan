@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Bucket
+   uuid = "3E89CAAC-DDFE-4E66-9C97-BC10B0FDEC5B"
+   type = "1"
+   version = "2.0">
+   <Breakpoints>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "4D447F20-3FEB-42BA-90C1-6651D0BD29BF"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Kukulcan/GameState.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "105"
+            endingLineNumber = "105"
+            landmarkName = "resolveIfReady(_:)"
+            landmarkType = "7">
+            <Locations>
+               <Location
+                  uuid = "4D447F20-3FEB-42BA-90C1-6651D0BD29BF - 5d9279c077ee0d0d"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "Kukulcan.GameState.resolveIfReady(Swift.Int) -&gt; ()"
+                  moduleName = "Kukulcan.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/jonathanlabbe/Desktop/chat_detective_bulle/Kukulcan/Kukulcan/GameState.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "105"
+                  endingLineNumber = "105">
+               </Location>
+               <Location
+                  uuid = "4D447F20-3FEB-42BA-90C1-6651D0BD29BF - d8e6a5566fe75055"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "closure #1 () -&gt; Swift.Int in Kukulcan.GameState.resolveIfReady(Swift.Int) -&gt; ()"
+                  moduleName = "Kukulcan.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/jonathanlabbe/Desktop/chat_detective_bulle/Kukulcan/Kukulcan/GameState.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "105"
+                  endingLineNumber = "105">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+   </Breakpoints>
+</Bucket>
