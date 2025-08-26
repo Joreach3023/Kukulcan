@@ -60,7 +60,11 @@ struct CollectionView: View {
                                     selectedCard = card
                                 }
                                 .overlay(alignment: .topTrailing) {
-                                    if count > 1 { QuantityBadge(count: count).padding(6) }
+                                    if count > 1 {
+                                        QuantityBadge(count: count)
+                                            .padding(.trailing, 6)
+                                            .padding(.top, 32)
+                                    }
                                 }
                             }
                         }
