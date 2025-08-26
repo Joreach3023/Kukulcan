@@ -1,44 +1,19 @@
 import SwiftUI
 
 struct CardBackView: View {
-    /// Largeur de la carte. Utilisée pour calculer la hauteur et la taille du motif.
+    /// Largeur de la carte. Utilisée pour calculer la hauteur du dos.
     var width: CGFloat = 140
     private let ratio: CGFloat = 1.5
 
     var body: some View {
         let h = width * ratio
 
-        return ZStack {
-            // Fond : dégradé sombre avec une bordure lumineuse subtile
-            RoundedRectangle(cornerRadius: 18)
-                .fill(
-                    LinearGradient(
-                        colors: [.black, .gray.opacity(0.7)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    .white.opacity(0.5),
-                                    .white.opacity(0.1)
-                                ],
-                                startPoint: .topLeading, endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 2
-                        )
-                )
-
-            // Symbole central (soleil)
-            Image("kinich_ahau")
-                .resizable()
-                .scaledToFit()
-                .frame(width: width * 0.5, height: width * 0.5)
-                .shadow(color: .white.opacity(0.4), radius: 6)
-        }
-        .frame(width: width, height: h)
+        Image("LaunchLogo")
+            .resizable()
+            .scaledToFill()
+            .frame(width: width, height: h)
+            .clipped()
+            .cornerRadius(18)
     }
 }
 
@@ -83,7 +58,7 @@ struct CardView: View {
             VStack(spacing: 0) {
                 // Bandeau haut
                 header
-                    .frame(height: max(36, width * 0.22))
+                    .frame(height: topHeight)
                     .frame(maxWidth: .infinity)
                     .background(headerBG)
                     .clipShape(RoundedCorners(topLeft: 18, topRight: 18, bottomLeft: 0, bottomRight: 0))
@@ -105,7 +80,7 @@ struct CardView: View {
 
                 // Bandeau bas (effet)
                 footer
-                    .frame(height: max(30, width * 0.18))
+                    .frame(height: bottomHeight)
                     .frame(maxWidth: .infinity)
                     .background(footerBG)
                     .clipShape(RoundedCorners(topLeft: 0, topRight: 0, bottomLeft: 18, bottomRight: 18))
@@ -141,8 +116,8 @@ struct CardView: View {
 
     // MARK: - Layout helpers
 
-    private var topHeight: CGFloat { max(36, width * 0.22) }
-    private var bottomHeight: CGFloat { max(30, width * 0.18) }
+    private var topHeight: CGFloat { max(18, width * 0.11) }
+    private var bottomHeight: CGFloat { max(15, width * 0.09) }
 
     private var header: some View {
         HStack(spacing: 8) {
