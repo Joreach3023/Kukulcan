@@ -27,6 +27,10 @@ struct CombatView: View {
     @Namespace private var drawNamespace
     @State private var animatingCard: Card? = nil
 
+    // Tailles réduites pour mieux voir l’ensemble du plateau
+    private let slotCardWidth: CGFloat = 72
+    private let slotCardHeight: CGFloat = 100
+
     var body: some View {
         ZStack {
             // Fond visuel du combat
@@ -81,7 +85,8 @@ struct CombatView: View {
                 handStrip
             }
             .padding(.horizontal, 12)
-            .padding(.bottom, 4)
+            // Ajout d’un padding supplémentaire pour dégager la barre de tabulation
+            .padding(.bottom, 64)
             .background(.ultraThinMaterial)
         }
         .fullScreenCover(item: $selectedCard) { card in
@@ -196,15 +201,15 @@ struct CombatView: View {
                 Text("Pioche").font(.caption).foregroundStyle(.secondary)
                 ZStack {
                     if engine.current.deck.isEmpty {
-                        emptySlot(width: 92, height: 128)
+                        emptySlot(width: slotCardWidth, height: slotCardHeight)
                     } else {
-                        CardBackView().frame(width: 92, height: 128)
+                        CardBackView().frame(width: slotCardWidth, height: slotCardHeight)
                         Text("\(engine.current.deck.count)")
                             .font(.headline.bold())
                             .foregroundStyle(.white)
                     }
                     if let animatingCard {
-                        CardBackView().frame(width: 92, height: 128)
+                        CardBackView().frame(width: slotCardWidth, height: slotCardHeight)
                             .matchedGeometryEffect(id: animatingCard.id, in: drawNamespace)
                     }
                 }
@@ -214,7 +219,7 @@ struct CombatView: View {
                 Text("Ton dieu").font(.caption).foregroundStyle(.secondary)
                 ZStack(alignment: .topTrailing) {
                     slotView(for: engine.current.godSlot?.base, hp: engine.current.godSlot?.currentHP)
-                        .frame(width: 92, height: 128)
+                        .frame(width: slotCardWidth, height: slotCardHeight)
                     if engine.current.godSlot != nil {
                         Button {
                             attackFromSlot = -1
@@ -235,20 +240,20 @@ struct CombatView: View {
                 Text("Sacrifice").font(.caption).foregroundStyle(.secondary)
                 // visuel tourné à 90° si présent
                 if let inst = engine.current.sacrificeSlot {
-                    CardView(card: inst.base, faceUp: true, width: 92) {
+                    CardView(card: inst.base, faceUp: true, width: slotCardWidth) {
                         selectedCard = inst.base
                     }
                     .rotationEffect(.degrees(90))
                     .overlay(Text("+1 Sang").font(.caption2.bold()).padding(4).background(.black.opacity(0.6)).clipShape(Capsule()).foregroundStyle(.white), alignment: .bottom)
                 } else {
-                    emptySlot(width: 92, height: 128)
+                    emptySlot(width: slotCardWidth, height: slotCardHeight)
                 }
             }
 
             VStack(spacing: 6) {
                 Text("Défausse").font(.caption).foregroundStyle(.secondary)
                 ZStack {
-                    emptySlot(width: 92, height: 128)
+                    emptySlot(width: slotCardWidth, height: slotCardHeight)
                     if !engine.current.discard.isEmpty {
                         Text("\(engine.current.discard.count)")
                             .font(.headline.bold())
@@ -348,7 +353,7 @@ struct CombatView: View {
     private func slotView(for card: Card?, hp: Int?) -> some View {
         ZStack {
             if let card {
-                CardView(card: card, faceUp: true, width: 92) {
+                CardView(card: card, faceUp: true, width: slotCardWidth) {
                     selectedCard = card
                 }
                 .overlay(alignment: .bottomTrailing) {
@@ -363,10 +368,10 @@ struct CombatView: View {
                     }
                     }
             } else {
-                emptySlot(width: 92, height: 128)
+                emptySlot(width: slotCardWidth, height: slotCardHeight)
             }
         }
-        .frame(width: 92, height: 128)
+        .frame(width: slotCardWidth, height: slotCardHeight)
     }
 
     private func emptySlot(width: CGFloat, height: CGFloat) -> some View {
