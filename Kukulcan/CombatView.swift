@@ -4,8 +4,13 @@ import UIKit
 struct CombatView: View {
     // Fournis un engine depuis l’extérieur si tu veux (collection/IA), sinon starter par défaut
     @StateObject private var engine: GameEngine
+    private let aiLevel: Int
+    var onWin: ((Int) -> Void)? = nil
+    @Environment(\.dismiss) private var dismiss
 
-    init(engine: GameEngine? = nil) {
+    init(engine: GameEngine? = nil, aiLevel: Int = 1, onWin: ((Int) -> Void)? = nil) {
+        self.aiLevel = aiLevel
+        self.onWin = onWin
         if let e = engine {
             _engine = StateObject(wrappedValue: e)
         } else {
@@ -124,6 +129,17 @@ struct CombatView: View {
         }
         .fullScreenCover(item: $selectedCard) { card in
             CardDetailView(card: card) { selectedCard = nil }
+        }
+        .onChange(of: engine.p1.hp) { hp in
+            if hp <= 0 {
+                dismiss()
+            }
+        }
+        .onChange(of: engine.p2.hp) { hp in
+            if hp <= 0 {
+                onWin?(aiLevel)
+                dismiss()
+            }
         }
     }
 
@@ -398,7 +414,7 @@ struct CombatView: View {
                 }
                 Button {
                     engine.endTurn()
-                    engine.performEasyAITurn()
+                    engine.performAITurn(level: aiLevel)
                 } label: {
                     Label("Fin du tour", systemImage: "arrow.uturn.right.circle.fill")
                 }
