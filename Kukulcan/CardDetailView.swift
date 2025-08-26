@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct CardDetailView: View {
     let card: Card
@@ -70,16 +71,17 @@ struct CardDetailView: View {
                                         .frame(width: w, height: h - topHeight(w) - bottomHeight(w))
                                         .clipped()
                                 } else {
-                                    // Dos simple
+                                    // Dos : fond coloré + soleil
                                     RoundedRectangle(cornerRadius: 12)
                                         .fill(
                                             LinearGradient(colors: card.rarity.colors,
                                                            startPoint: .topLeading, endPoint: .bottomTrailing)
                                         )
                                         .overlay(
-                                            Image(systemName: "triangle.fill")
-                                                .font(.system(size: 48, weight: .bold))
-                                                .foregroundStyle(.white.opacity(0.8))
+                                            Image("kinich_ahau")
+                                                .resizable()
+                                                .scaledToFit()
+                                                .frame(width: w * 0.4, height: w * 0.4)
                                         )
                                         .frame(width: w, height: h - topHeight(w) - bottomHeight(w))
                                         .clipped()
@@ -109,17 +111,26 @@ struct CardDetailView: View {
                         .rotation3DEffect(.degrees(Double(tilt.width / 10)), axis: (x: 0, y: 1, z: 0))
                         .rotation3DEffect(.degrees(Double(-tilt.height / 10)), axis: (x: 1, y: 0, z: 0))
                         .gesture(
-                            DragGesture(minimumDistance: 20)
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { value in
+                                    tilt = CGSize(
+                                        width: value.translation.width.clamped(to: -40...40),
+                                        height: value.translation.height.clamped(to: -40...40)
+                                    )
+                                }
                                 .onEnded { value in
-                                    // Swipe horizontal -> flip
-                                    if abs(value.translation.width) > abs(value.translation.height),
-                                       abs(value.translation.width) > 30 {
+                                    let translation = value.translation
+                                    if abs(translation.width) > abs(translation.height),
+                                       abs(translation.width) > 30 {
                                         withAnimation(.easeInOut(duration: 0.35)) { isFlipped.toggle() }
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                     }
+                                    withAnimation(.spring()) { tilt = .zero }
                                 }
                         )
                         .onTapGesture {
                             withAnimation(.easeInOut(duration: 0.35)) { isFlipped.toggle() }
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         }
 
                         .accessibilityAddTraits(.isButton)
