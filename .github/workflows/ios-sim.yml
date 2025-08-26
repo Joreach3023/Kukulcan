@@ -1,0 +1,19 @@
+name: iOS Simulator
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test on iOS simulator
+        run: |
+          xcodebuild \
+            -project Kukulcan.xcodeproj \
+            -scheme Kukulcan \
+            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            build test
