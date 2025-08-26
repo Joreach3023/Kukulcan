@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import AudioToolbox
 
 struct CombatView: View {
     // Fournis un engine depuis l’extérieur si tu veux (collection/IA), sinon starter par défaut
@@ -43,6 +44,8 @@ struct CombatView: View {
     // Tailles réduites pour mieux voir l’ensemble du plateau
     private let slotCardWidth: CGFloat = 72
     private let slotCardHeight: CGFloat = 100
+    private let deckCardWidth: CGFloat = 46
+    private let deckCardHeight: CGFloat = 64
 
     var body: some View {
         GeometryReader { _ in
@@ -119,13 +122,21 @@ struct CombatView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 8) {
-                footerControls
-                handStrip
+            handStrip
+                .padding(.horizontal, 12)
+                .padding(.bottom, 16)
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                Button("Fin du tour") {
+                    playEndTurnSound()
+                    engine.endTurn()
+                    engine.performAITurn(level: aiLevel)
+                }
+                Button("Fin de partie") {
+                    dismiss()
+                }
             }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 16)
-            .background(.ultraThinMaterial)
         }
         .fullScreenCover(item: $selectedCard) { card in
             CardDetailView(card: card) { selectedCard = nil }
@@ -268,15 +279,15 @@ struct CombatView: View {
                 Text("Pioche").font(.caption).foregroundStyle(.secondary)
                 ZStack {
                     if engine.current.deck.isEmpty {
-                        emptySlot(width: slotCardWidth, height: slotCardHeight)
+                        emptySlot(width: deckCardWidth, height: deckCardHeight)
                     } else {
-                        CardBackView().frame(width: slotCardWidth, height: slotCardHeight)
+                        CardBackView().frame(width: deckCardWidth, height: deckCardHeight)
                         Text("\(engine.current.deck.count)")
                             .font(.headline.bold())
                             .foregroundStyle(.white)
                     }
                     if let animatingCard {
-                        CardBackView().frame(width: slotCardWidth, height: slotCardHeight)
+                        CardBackView().frame(width: deckCardWidth, height: deckCardHeight)
                             .matchedGeometryEffect(id: animatingCard.id, in: drawNamespace)
                     }
                 }
@@ -336,51 +347,48 @@ struct CombatView: View {
 
     // MARK: - Main du joueur
     private var handStrip: some View {
-        VStack(spacing: 6) {
-            Text("Ta main").font(.caption).foregroundStyle(.secondary)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(engine.current.hand.indices, id: \.self) { idx in
-                        let c = engine.current.hand[idx]
-                        CardView(card: c, faceUp: true, width: 120) {
-                            selectedCard = c
-                        }
-                        .matchedGeometryEffect(id: c.id, in: drawNamespace)
-                        .rotation3DEffect(.degrees(12), axis: (x: 1, y: 0, z: 0))
-                        .opacity((animatingCard?.id == c.id || draggingCardIndex == idx) ? 0 : 1)
-                        .gesture(
-                            DragGesture(minimumDistance: 0, coordinateSpace: .named("combatArea"))
-                                .onChanged { value in
-                                    guard value.translation.height < 0 else { return }
-                                    if draggingCardIndex == nil {
-                                        draggingCardIndex = idx
-                                    }
-                                    dragPosition = value.location
-                                    if let slot = slotFrames.first(where: { $0.value.contains(value.location) })?.key {
-                                        if hoveredSlot != slot {
-                                            hoveredSlot = slot
-                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        }
-                                    } else {
-                                        hoveredSlot = nil
-                                    }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(engine.current.hand.indices, id: \.self) { idx in
+                    let c = engine.current.hand[idx]
+                    CardView(card: c, faceUp: true, width: 120) {
+                        selectedCard = c
+                    }
+                    .matchedGeometryEffect(id: c.id, in: drawNamespace)
+                    .rotation3DEffect(.degrees(12), axis: (x: 1, y: 0, z: 0))
+                    .opacity((animatingCard?.id == c.id || draggingCardIndex == idx) ? 0 : 1)
+                    .gesture(
+                        DragGesture(minimumDistance: 0, coordinateSpace: .named("combatArea"))
+                            .onChanged { value in
+                                guard value.translation.height < 0 else { return }
+                                if draggingCardIndex == nil {
+                                    draggingCardIndex = idx
                                 }
-                                .onEnded { _ in
-                                    if let slot = hoveredSlot {
-                                        engine.playCommonToBoard(handIndex: idx, slot: slot)
+                                dragPosition = value.location
+                                if let slot = slotFrames.first(where: { $0.value.contains(value.location) })?.key {
+                                    if hoveredSlot != slot {
+                                        hoveredSlot = slot
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                     }
-                                    draggingCardIndex = nil
+                                } else {
                                     hoveredSlot = nil
                                 }
-                        )
-                        .overlay(alignment: .bottom) {
-                            actionButtonsForHandCard(c, index: idx)
-                                .padding(.bottom, 6)
-                        }
+                            }
+                            .onEnded { _ in
+                                if let slot = hoveredSlot {
+                                    engine.playCommonToBoard(handIndex: idx, slot: slot)
+                                }
+                                draggingCardIndex = nil
+                                hoveredSlot = nil
+                            }
+                    )
+                    .overlay(alignment: .bottom) {
+                        actionButtonsForHandCard(c, index: idx)
+                            .padding(.bottom, 6)
                     }
                 }
-                .padding(.horizontal, 4)
             }
+            .padding(.horizontal, 4)
         }
     }
 
@@ -416,31 +424,6 @@ struct CombatView: View {
         }
     }
 
-    // MARK: - Bas de vue (log + fin de tour)
-    private var footerControls: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Text(engine.log.last ?? "À toi de jouer.")
-                    .font(.footnote)
-                    .lineLimit(2)
-                Spacer()
-                Button {
-                    engine.resetGame()
-                } label: {
-                    Label("Nouvelle partie", systemImage: "arrow.clockwise")
-                }
-                Button {
-                    engine.endTurn()
-                    engine.performAITurn(level: aiLevel)
-                } label: {
-                    Label("Fin du tour", systemImage: "arrow.uturn.right.circle.fill")
-                }
-                .buttonStyle(.borderedProminent)
-            }
-        }
-        .padding(.vertical, 6)
-    }
-
     // MARK: - Helpers visuels
     private func slotView(for card: Card?, hp: Int?) -> some View {
         ZStack {
@@ -468,9 +451,17 @@ struct CombatView: View {
 
     private func emptySlot(width: CGFloat, height: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: 12)
-            .stroke(style: StrokeStyle(lineWidth: 2, dash: [6,4]))
-            .foregroundStyle(.secondary)
+            .fill(Color.white)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [6,4]))
+                    .foregroundStyle(.secondary)
+            )
             .frame(width: width, height: height)
+    }
+
+    private func playEndTurnSound() {
+        AudioServicesPlaySystemSound(1057)
     }
 
     private func labelChip(_ text: String, system: String) -> some View {
