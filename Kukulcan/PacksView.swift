@@ -99,7 +99,6 @@ struct PacksView: View {
             CardDetailView(card: card) { selectedCard = nil }
         }
         .onAppear { AudioManager.shared.play(.home) }
-        .onDisappear { AudioManager.shared.stop() }
     }
 }
 
