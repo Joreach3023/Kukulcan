@@ -5,14 +5,21 @@ import SwiftUI
 final class CollectionStore: ObservableObject {
     // Persistance locale
     @AppStorage("owned_cards_v2") private var ownedData: Data = Data()
+    @AppStorage("player_decks_v1") private var decksData: Data = Data()
 
     // Cartes possédées
     @Published var owned: [Card] = [] {
         didSet { save() }
     }
 
+    // Decks du joueur (max 20)
+    @Published var decks: [Deck] = [] {
+        didSet { saveDecks() }
+    }
+
     init() {
         load()
+        loadDecks()
     }
 
     // MARK: - Packs
@@ -86,10 +93,34 @@ final class CollectionStore: ObservableObject {
         }
     }
 
+    private func saveDecks() {
+        do {
+            let data = try JSONEncoder().encode(decks)
+            decksData = data
+        } catch {
+#if DEBUG
+            print("Erreur d’encodage des decks: \(error)")
+#endif
+        }
+    }
+
+    private func loadDecks() {
+        guard !decksData.isEmpty else { return }
+        do {
+            let arr = try JSONDecoder().decode([Deck].self, from: decksData)
+            decks = arr
+        } catch {
+#if DEBUG
+            print("Erreur de décodage des decks: \(error)")
+#endif
+        }
+    }
+
     // MARK: - Debug / Reset
 
     func resetCollection() {
         owned.removeAll()
+        decks.removeAll()
     }
 }
 
