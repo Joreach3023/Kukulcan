@@ -73,7 +73,9 @@ final class CollectionStore: ObservableObject {
             let data = try JSONEncoder().encode(owned)
             ownedData = data
         } catch {
+#if DEBUG
             print("Erreur d’encodage des cartes possédées: \(error)")
+#endif
         }
     }
 
@@ -83,7 +85,9 @@ final class CollectionStore: ObservableObject {
             let arr = try JSONDecoder().decode([Card].self, from: ownedData)
             owned = arr
         } catch {
+#if DEBUG
             print("Erreur de décodage des cartes possédées: \(error)")
+#endif
         }
     }
 
