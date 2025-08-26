@@ -163,7 +163,9 @@ struct CombatView: View {
                 HStack(spacing: 10) {
                     Label("\(engine.p1.hp)", systemImage: "heart.fill")
                     Label("\(engine.p1.blood)", systemImage: "drop.fill")
-                }.font(.subheadline)
+                }
+                .font(.subheadline)
+                .foregroundColor(.white)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
@@ -172,7 +174,9 @@ struct CombatView: View {
                 HStack(spacing: 10) {
                     Label("\(engine.p2.hp)", systemImage: "heart.fill")
                     Label("\(engine.p2.blood)", systemImage: "drop.fill")
-                }.font(.subheadline)
+                }
+                .font(.subheadline)
+                .foregroundColor(.white)
             }
         }
     }
