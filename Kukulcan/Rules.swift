@@ -372,6 +372,73 @@ final class GameEngine: ObservableObject {
         endTurn()
     }
 
+    // MARK: - IA progressive
+    func performAITurn(level: Int) {
+        switch level {
+        case 1: performEasyAITurn()
+        case 2: performMediumAITurn()
+        case 3: performHardAITurn()
+        case 4: performExpertAITurn()
+        default: performMasterAITurn()
+        }
+    }
+
+    private func performMediumAITurn() {
+        guard !currentPlayerIsP1 else { return }
+        // Pose autant de communes que possible
+        while let slot = current.board.firstIndex(where: { $0 == nil }),
+              let idx = current.hand.firstIndex(where: { $0.type == .common }) {
+            playCommonToBoard(handIndex: idx, slot: slot)
+        }
+        // Attaque les emplacements adverses ou le joueur s'ils sont libres
+        for i in 0..<current.board.count {
+            if current.board[i] != nil {
+                let target: Target = opponent.board[i] != nil ? .boardSlot(i) : .player
+                attack(from: i, to: target)
+            }
+        }
+        if current.godSlot != nil {
+            attack(from: -1, to: .player)
+        }
+        endTurn()
+    }
+
+    private func performHardAITurn() {
+        guard !currentPlayerIsP1 else { return }
+        // Tente d'invoquer un dieu, sinon sacrifie pour gagner du sang
+        if let gIdx = current.hand.firstIndex(where: { $0.type == .god }) {
+            let god = current.hand[gIdx]
+            if current.blood >= god.bloodCost {
+                invokeGod(handIndex: gIdx)
+            } else if let sac = current.hand.firstIndex(where: { $0.type == .common }) {
+                sacrificeCommon(handIndex: sac)
+            }
+        }
+        performMediumAITurn()
+    }
+
+    private func performExpertAITurn() {
+        guard !currentPlayerIsP1 else { return }
+        // Utilise un rituel si disponible
+        if let rIdx = current.hand.firstIndex(where: { $0.type == .ritual }) {
+            if let slot = current.board.firstIndex(where: { $0 != nil }) {
+                playRitual(handIndex: rIdx, targetSlot: slot)
+            } else {
+                playRitual(handIndex: rIdx)
+            }
+        }
+        performHardAITurn()
+    }
+
+    private func performMasterAITurn() {
+        guard !currentPlayerIsP1 else { return }
+        // Sacrifie d'abord si possible pour préparer les gros tours
+        if let sac = current.hand.firstIndex(where: { $0.type == .common }) {
+            sacrificeCommon(handIndex: sac)
+        }
+        performExpertAITurn()
+    }
+
     // MARK: - Réinitialisation
     func resetGame() {
         p1 = PlayerState(name: p1.name, deck: StarterFactory.playerDeck())
