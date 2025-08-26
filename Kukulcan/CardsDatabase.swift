@@ -23,7 +23,7 @@ struct CardsDB {
         atk: Int,
         hp: Int,
         img: String,
-        effect: String? = nil,
+        effect: String,
         lore: String? = nil
     ) -> Card {
         Card(
@@ -68,6 +68,7 @@ struct CardsDB {
         hp: Int,
         img: String,
         bloodCost: Int = 7,
+        effect: String,
         lore: String
     ) -> Card {
         Card(
@@ -79,7 +80,7 @@ struct CardsDB {
             health: hp,
             ritual: nil,
             bloodCost: bloodCost,
-            effect: "Invocation : pouvoir divin.",
+            effect: effect,
             lore: lore
         )
     }
@@ -95,18 +96,22 @@ struct CardsDB {
         common("Jeune chasseur",
                atk: 2, hp: 1,
                img: "jeune_chasseur",
+               effect: "Arrivée : pioche 1.",
                lore: "Encore naïf, il croit pouvoir survivre à l’épreuve."),
         common("Prisonnier captif",
                atk: 1, hp: 2,
                img: "prisonnier_captif",
+               effect: "Mort : +1 sang.",
                lore: "Ses chaînes résonnent comme un chant d’offrande."),
         common("Guerrier blessé",
                atk: 2, hp: 3,
                img: "guerrier_blesse",
+               effect: "Arrivée : gagne +1 PV.",
                lore: "Le sang qui s’écoule de sa plaie est déjà une offrande."),
         common("Éclaireur perdu",
                atk: 1, hp: 2,
                img: "eclaireur_perdu",
+               effect: "Sacrifice : pioche 1.",
                lore: "Isolé dans la jungle, il devient proie autant que soldat."),
         common("Archer maladroit",
                atk: 2, hp: 2,
@@ -154,26 +159,32 @@ struct CardsDB {
         god("Kinich Ahau",
             atk: 7, hp: 7,
             img: "kinich_ahau",
+            effect: "Invocation : brûle les impies.",
             lore: "Le soleil brûlant de Kinich Ahau éclaire la jungle et châtie ses ennemis d’une chaleur implacable."),
         god("Kukulcan",
             atk: 7, hp: 8,
             img: "kukulcan",                      // ⚠️ bien orthographié
+            effect: "Invocation : le serpent à plumes se déchaîne.",
             lore: "Le serpent à plumes s’élève dans le vent et fauche les orgueilleux d’un seul souffle."),
         god("Chaac",
             atk: 6, hp: 7,
             img: "chaac",
+            effect: "Invocation : la pluie et la foudre répondent.",
             lore: "Le tonnerre gronde avec Chaac, et chaque éclair abreuve tout… ou foudroie les impies."),
         god("Ix Chel",
             atk: 6, hp: 7,
             img: "ix_chel",
+            effect: "Invocation : voile lunaire.",
             lore: "Déesse de la lune et des marées, elle ourdit les destins comme on tisse un voile d’argent."),
         god("Itzamna",
             atk: 5, hp: 7,
             img: "itzamna",
+            effect: "Invocation : sagesse des origines.",
             lore: "Seigneur du ciel et des écritures, il murmure la naissance et la fin des mondes."),
         god("Buluc Chabtan",
             atk: 6, hp: 6,
             img: "buluc_chabtan",
+            effect: "Invocation : héraut de la guerre.",
             lore: "La guerre est sa prière ; il exige des cœurs ardents et offre la victoire en retour.")
     ]
 

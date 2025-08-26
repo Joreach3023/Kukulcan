@@ -28,7 +28,7 @@ struct Card: Identifiable, Codable, Hashable {
 
     // Coûts / mécaniques
     let bloodCost: Int    // coût d’invocation pour un dieu (sinon 0)
-    let effect: String?   // texte synthétique à afficher sur la carte (footer)
+    let effect: String    // texte synthétique à afficher sur la carte (footer)
     let lore: String?     // visible seulement en vue zoom
 
     init(name: String,
@@ -39,7 +39,7 @@ struct Card: Identifiable, Codable, Hashable {
          health: Int = 0,
          ritual: RitualKind? = nil,
          bloodCost: Int = 0,
-         effect: String? = nil,
+         effect: String,
          lore: String? = nil) {
         self.name = name
         self.type = type
@@ -364,7 +364,7 @@ final class GameEngine: ObservableObject {
 // MARK: - Sample Decks (starter)
 
 struct StarterFactory {
-    static func common(_ name: String, atk: Int, hp: Int, img: String, effect: String? = nil) -> Card {
+    static func common(_ name: String, atk: Int, hp: Int, img: String, effect: String) -> Card {
         Card(name: name, type: .common, rarity: .common, imageName: img,
              attack: atk, health: hp, effect: effect, lore: nil)
     }
@@ -372,9 +372,9 @@ struct StarterFactory {
         Card(name: name, type: .ritual, rarity: .rare, imageName: img,
              ritual: kind, effect: effect)
     }
-    static func god(_ name: String, atk: Int, hp: Int, img: String, cost: Int, lore: String) -> Card {
+    static func god(_ name: String, atk: Int, hp: Int, img: String, cost: Int, effect: String, lore: String) -> Card {
         Card(name: name, type: .god, rarity: .legendary, imageName: img,
-             attack: atk, health: hp, bloodCost: cost, effect: "Invocation : pouvoir divin.", lore: lore)
+             attack: atk, health: hp, bloodCost: cost, effect: effect, lore: lore)
     }
 
     static func playerDeck() -> [Card] {
@@ -382,10 +382,14 @@ struct StarterFactory {
         // Communes (utilise les noms d’assets que tu as)
         d += Array(repeating: common("Villageois effrayé", atk: 1, hp: 1, img: "villageois_effraye",
                                      effect: "Sacrifice : +1 sang."), count: 3)
-        d += Array(repeating: common("Jeune chasseur", atk: 2, hp: 1, img: "jeune_chasseur"), count: 2)
-        d += Array(repeating: common("Prisonnier captif", atk: 1, hp: 2, img: "prisonnier_captif"), count: 2)
-        d += [common("Guerrier blessé", atk: 2, hp: 3, img: "guerrier_blesse")]
-        d += [common("Éclaireur perdu", atk: 1, hp: 2, img: "eclaireur_perdu")]
+        d += Array(repeating: common("Jeune chasseur", atk: 2, hp: 1, img: "jeune_chasseur",
+                                     effect: "Arrivée : pioche 1."), count: 2)
+        d += Array(repeating: common("Prisonnier captif", atk: 1, hp: 2, img: "prisonnier_captif",
+                                     effect: "Mort : +1 sang."), count: 2)
+        d += [common("Guerrier blessé", atk: 2, hp: 3, img: "guerrier_blesse",
+                     effect: "Arrivée : gagne +1 PV.")]
+        d += [common("Éclaireur perdu", atk: 1, hp: 2, img: "eclaireur_perdu",
+                     effect: "Sacrifice : pioche 1.")]
         d += [common("Archer maladroit", atk: 2, hp: 2, img: "archer_maladroit",
                      effect: "Si tue une carte : pioche 1.")]
 
@@ -396,8 +400,10 @@ struct StarterFactory {
 
         // Dieux (tes assets existants)
         d += [god("Ix Chel", atk: 6, hp: 7, img: "ix_chel", cost: 7,
+                  effect: "Invocation : voile lunaire.",
                   lore: "Déesse de la lune et des marées, elle ourdit les destins comme on tisse un voile d’argent.")]
         d += [god("Kukulcan", atk: 7, hp: 8, img: "kukulcan", cost: 7,
+                  effect: "Invocation : le serpent à plumes se déchaîne.",
                   lore: "Serpent à plumes, cyclone vivant des jungles oubliées.")]
         return d
     }
