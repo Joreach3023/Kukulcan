@@ -77,6 +77,32 @@ struct KukulcanTests {
         #expect(engine.p1.pendingBonusBlood == 0)
     }
 
+    /// Blood gained should persist across turns so players can save for gods.
+    @Test func bloodAccumulatesAcrossTurns() {
+        var p1 = PlayerState(name: "P1")
+        let p2 = PlayerState(name: "P2")
+        let common = Card(name: "Soldat", type: .common, rarity: .common,
+                          imageName: "soldat", attack: 1, health: 1, effect: "")
+        // Deux cartes pour pouvoir sacrifier deux fois
+        p1.hand = [common, common]
+        let engine = GameEngine(p1: p1, p2: p2)
+
+        // Premier sacrifice
+        engine.sacrificeCommon(handIndex: 0)
+        #expect(engine.p1.blood == 1)
+
+        // Fin du tour de P1 puis P2 termine immédiatement son tour
+        engine.endTurn()
+        engine.endTurn()
+
+        // Le sang doit être conservé
+        #expect(engine.p1.blood == 1)
+
+        // Nouveau sacrifice pour accumuler
+        engine.sacrificeCommon(handIndex: 0)
+        #expect(engine.p1.blood == 2)
+    }
+
     /// Decks should respect copy limits: max 3 per card, 1 for gods.
     @Test func deckCopyLimits() {
         let c1 = Card(name: "Soldat", type: .common, rarity: .common,

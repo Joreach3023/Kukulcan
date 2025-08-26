@@ -330,7 +330,17 @@ final class GameEngine: ObservableObject {
     }
 
     func endTurn() {
-        // reset visuel slot sacrifice et bonus de sang
+        // Nettoie les états temporaires du joueur actif
+        resetEndTurnState()
+        // Le sang n'est pas réinitialisé : il s'accumule d'un tour à l'autre
+        currentPlayerIsP1.toggle()
+        log.append("—— Tour terminé. À \(activeName()) de jouer.")
+        // pioche automatique
+        drawForCurrent(1)
+    }
+
+    /// Réinitialise les informations temporaires de fin de tour
+    private func resetEndTurnState() {
         if currentPlayerIsP1 {
             p1.sacrificeSlot = nil
             p1.pendingBonusBlood = 0
@@ -338,10 +348,6 @@ final class GameEngine: ObservableObject {
             p2.sacrificeSlot = nil
             p2.pendingBonusBlood = 0
         }
-        currentPlayerIsP1.toggle()
-        log.append("—— Tour terminé. À \(activeName()) de jouer.")
-        // pioche automatique
-        drawForCurrent(1)
     }
 
     // MARK: - Helpers mutateurs
