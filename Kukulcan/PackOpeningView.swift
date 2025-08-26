@@ -11,6 +11,7 @@ struct PackOpeningView: View {
     @State private var packOpacity: Double = 1.0
     @State private var burst: Double = 0.0
     @State private var selectedCard: Card? = nil
+    @State private var highlightIndex: Int? = nil
 
     var body: some View {
         ZStack {
@@ -105,6 +106,13 @@ private extension PackOpeningView {
             .shadow(color: cards[i].rarity.glow, radius: 14)
         } else {
             PlaceholderCard(width: 120, height: 180)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.yellow, lineWidth: 4)
+                        .shadow(color: .yellow, radius: 10)
+                        .opacity(highlightIndex == i ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.3), value: highlightIndex)
+                )
         }
     }
 
@@ -145,19 +153,39 @@ private extension PackOpeningView {
                 stage = 1
                 burst = 10
             }
-            // Révéler les cartes en cascade
+            // Révéler les cartes en cascade avec suspense pour les légendaires
+            var maxReveal: Double = 0
             for i in 0..<min(3, cards.count) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25 + Double(i) * 0.3) {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
-                        showCards[i] = true
+                let base = 0.25 + Double(i) * 0.3
+                if cards[i].rarity == .legendary {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + base) {
+                        highlightIndex = i
                     }
-                    let g = UINotificationFeedbackGenerator()
-                    g.notificationOccurred(.success)
-                    AudioServicesPlaySystemSound(1104) // petit “tock” système
+                    let reveal = base + 0.6
+                    DispatchQueue.main.asyncAfter(deadline: .now() + reveal) {
+                        highlightIndex = nil
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+                            showCards[i] = true
+                        }
+                        let g = UINotificationFeedbackGenerator()
+                        g.notificationOccurred(.success)
+                        AudioServicesPlaySystemSound(1104)
+                    }
+                    maxReveal = max(maxReveal, reveal)
+                } else {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + base) {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+                            showCards[i] = true
+                        }
+                        let g = UINotificationFeedbackGenerator()
+                        g.notificationOccurred(.success)
+                        AudioServicesPlaySystemSound(1104)
+                    }
+                    maxReveal = max(maxReveal, base)
                 }
             }
             // Bouton
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + maxReveal + 0.35) {
                 withAnimation(.easeInOut(duration: 0.35)) { stage = 2 }
             }
         }
