@@ -42,7 +42,7 @@ struct CardDetailView: View {
                     let w = min(geo.size.width * 0.85, 360)
                     let h = w * ratio
 
-                    ZStack {
+                    let front = ZStack {
                         RoundedRectangle(cornerRadius: corner)
                             .fill(.ultraThinMaterial)
                             .overlay(
@@ -54,7 +54,7 @@ struct CardDetailView: View {
                         VStack(spacing: 0) {
                             // Bandeau haut
                             header
-                                .frame(height: max(44, w * 0.22))
+                                .frame(height: topHeight(w))
                                 .frame(maxWidth: .infinity)
                                 .background(
                                     LinearGradient(colors: [.black.opacity(0.55), .black.opacity(0.25)],
@@ -62,31 +62,12 @@ struct CardDetailView: View {
                                 )
                                 .clipShape(RoundedCorners(topLeft: corner, topRight: corner, bottomLeft: 0, bottomRight: 0))
 
-                            // Illustration / Dos
-                            ZStack {
-                                if !isFlipped {
-                                    Image(card.imageName)
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: w, height: h - topHeight(w) - bottomHeight(w))
-                                        .clipped()
-                                } else {
-                                    // Dos : fond coloré + soleil
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(
-                                            LinearGradient(colors: card.rarity.colors,
-                                                           startPoint: .topLeading, endPoint: .bottomTrailing)
-                                        )
-                                        .overlay(
-                                            Image("kinich_ahau")
-                                                .resizable()
-                                                .scaledToFit()
-                                                .frame(width: w * 0.4, height: w * 0.4)
-                                        )
-                                        .frame(width: w, height: h - topHeight(w) - bottomHeight(w))
-                                        .clipped()
-                                }
-                            }
+                            // Illustration
+                            Image(card.imageName)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: w, height: h - topHeight(w) - bottomHeight(w))
+                                .clipped()
 
                             // Bandeau bas (texte d’effet)
                             HStack {
@@ -98,7 +79,7 @@ struct CardDetailView: View {
                                 Spacer(minLength: 0)
                             }
                             .padding(.horizontal, 12)
-                            .frame(height: max(38, w * 0.18))
+                            .frame(height: bottomHeight(w))
                             .frame(maxWidth: .infinity)
                             .background(
                                 LinearGradient(colors: [.black.opacity(0.30), .black.opacity(0.55)],
@@ -107,35 +88,48 @@ struct CardDetailView: View {
                             .clipShape(RoundedCorners(topLeft: 0, topRight: 0, bottomLeft: corner, bottomRight: corner))
                         }
                         .frame(width: w, height: h)
-                        .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
-                        .rotation3DEffect(.degrees(Double(tilt.width / 10)), axis: (x: 0, y: 1, z: 0))
-                        .rotation3DEffect(.degrees(Double(-tilt.height / 10)), axis: (x: 1, y: 0, z: 0))
-                        .gesture(
-                            DragGesture(minimumDistance: 0)
-                                .onChanged { value in
-                                    tilt = CGSize(
-                                        width: value.translation.width.clamped(to: -40...40),
-                                        height: value.translation.height.clamped(to: -40...40)
-                                    )
-                                }
-                                .onEnded { value in
-                                    let translation = value.translation
-                                    if abs(translation.width) > abs(translation.height),
-                                       abs(translation.width) > 30 {
-                                        withAnimation(.easeInOut(duration: 0.35)) { isFlipped.toggle() }
-                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                    }
-                                    withAnimation(.spring()) { tilt = .zero }
-                                }
-                        )
-                        .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.35)) { isFlipped.toggle() }
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        }
-
-                        .accessibilityAddTraits(.isButton)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    let back = CardBackView(width: w, cornerRadius: corner)
+
+                    let cardStack = ZStack {
+                        front
+                            .opacity(isFlipped ? 0 : 1)
+                            .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
+
+                        back
+                            .opacity(isFlipped ? 1 : 0)
+                            .rotation3DEffect(.degrees(isFlipped ? 0 : -180), axis: (x: 0, y: 1, z: 0))
+                    }
+                    .frame(width: w, height: h)
+                    .rotation3DEffect(.degrees(Double(tilt.width / 10)), axis: (x: 0, y: 1, z: 0))
+                    .rotation3DEffect(.degrees(Double(-tilt.height / 10)), axis: (x: 1, y: 0, z: 0))
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                tilt = CGSize(
+                                    width: value.translation.width.clamped(to: -40...40),
+                                    height: value.translation.height.clamped(to: -40...40)
+                                )
+                            }
+                            .onEnded { value in
+                                let translation = value.translation
+                                if abs(translation.width) > abs(translation.height),
+                                   abs(translation.width) > 30 {
+                                    withAnimation(.easeInOut(duration: 0.35)) { isFlipped.toggle() }
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                }
+                                withAnimation(.spring()) { tilt = .zero }
+                            }
+                    )
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.35)) { isFlipped.toggle() }
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    }
+                    .accessibilityAddTraits(.isButton)
+
+                    cardStack
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .frame(height: 520)
 
@@ -175,8 +169,8 @@ struct CardDetailView: View {
 
     // MARK: - Subviews / helpers
 
-    private func topHeight(_ w: CGFloat) -> CGFloat { max(44, w * 0.22) }
-    private func bottomHeight(_ w: CGFloat) -> CGFloat { max(38, w * 0.18) }
+    private func topHeight(_ w: CGFloat) -> CGFloat { max(22, w * 0.11) }
+    private func bottomHeight(_ w: CGFloat) -> CGFloat { max(19, w * 0.09) }
 
     private var header: some View {
         HStack(spacing: 8) {

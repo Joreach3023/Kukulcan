@@ -3,6 +3,8 @@ import SwiftUI
 struct CardBackView: View {
     /// Largeur de la carte. Utilisée pour calculer la hauteur du dos.
     var width: CGFloat = 140
+    /// Rayon des coins pour adapter l'arrondi selon le format d'affichage.
+    var cornerRadius: CGFloat = 18
     private let ratio: CGFloat = 1.5
 
     var body: some View {
@@ -13,7 +15,7 @@ struct CardBackView: View {
             .scaledToFill()
             .frame(width: width, height: h)
             .clipped()
-            .cornerRadius(18)
+            .cornerRadius(cornerRadius)
     }
 }
 
