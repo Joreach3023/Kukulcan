@@ -8,19 +8,18 @@ struct ElementClashApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                MainTabView()
-                    .environmentObject(collection)
-                    .opacity(showSplash ? 0 : 1)
-                    .transition(.opacity)
-
                 if showSplash {
-                    // Si tu utilises l’intro “MayaBloodSplashView”
+                    // Écran d’introduction sans musique
                     MayaBloodSplashView {
                         withAnimation(.easeInOut(duration: 0.35)) {
                             showSplash = false
                         }
                     }
                     .transition(.opacity)
+                } else {
+                    MainTabView()
+                        .environmentObject(collection)
+                        .transition(.opacity)
                 }
             }
         }

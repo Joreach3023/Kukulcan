@@ -96,9 +96,6 @@ struct CombatView: View {
             }
             AudioManager.shared.play(.combat)
         }
-        .onDisappear {
-            AudioManager.shared.stop()
-        }
         .onChange(of: engine.lastDrawnCard) { card in
             guard let card else { return }
             animatingCard = card

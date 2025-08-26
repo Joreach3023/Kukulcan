@@ -84,7 +84,6 @@ struct CollectionView: View {
             CardDetailView(card: card) { selectedCard = nil }
         }
         .onAppear { AudioManager.shared.play(.collection) }
-        .onDisappear { AudioManager.shared.stop() }
     }
 
 

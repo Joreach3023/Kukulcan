@@ -12,6 +12,8 @@ final class AudioManager {
     }
 
     func play(_ track: Track, volume: Float = 0.25) {
+        // Arrête toute piste en cours avant d'en jouer une nouvelle
+        stop()
         guard let url = Bundle.main.url(forResource: track.rawValue, withExtension: "mp3") else {
             print("Missing sound file: \(track.rawValue).mp3")
             return
