@@ -29,40 +29,56 @@ struct CombatView: View {
     @State private var animatingCard: Card? = nil
     @State private var showBloodRiver = false
 
+    // Drag & drop depuis la main vers le board
+    @State private var draggingCardIndex: Int? = nil
+    @State private var dragPosition: CGPoint = .zero
+    @State private var hoveredSlot: Int? = nil
+    @State private var slotFrames: [Int: CGRect] = [:]
+
     // Tailles réduites pour mieux voir l’ensemble du plateau
     private let slotCardWidth: CGFloat = 72
     private let slotCardHeight: CGFloat = 100
 
     var body: some View {
-        ZStack {
-            // Fond visuel du combat
-            CombatBackground()
+        GeometryReader { _ in
+            ZStack {
+                // Fond visuel du combat
+                CombatBackground()
 
-            VStack(spacing: 10) {
-                header
+                VStack(spacing: 10) {
+                    header
 
-                // Opposant (aperçu simple)
-                opponentStrip
+                    // Opposant (aperçu simple)
+                    opponentStrip
 
-                Divider().opacity(0.3)
+                    Divider().opacity(0.3)
 
-                // Board du joueur (4 slots)
-                boardArea
+                    // Board du joueur (4 slots)
+                    boardArea
 
-                // Zone Dieu + Sacrifice + Défausse
-                zonesRow
+                    // Zone Dieu + Sacrifice + Défausse
+                    zonesRow
 
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
 
-            if showBloodRiver {
-                BloodRiverView()
-                    .transition(.move(edge: .top))
-                    .allowsHitTesting(false)
+                if showBloodRiver {
+                    BloodRiverView()
+                        .transition(.move(edge: .top))
+                        .allowsHitTesting(false)
+                }
+
+                if let idx = draggingCardIndex {
+                    CardView(card: engine.current.hand[idx], faceUp: true, width: 120)
+                        .position(dragPosition)
+                        .shadow(radius: 8)
+                        .zIndex(1)
+                }
             }
         }
+        .coordinateSpace(name: "combatArea")
         .onAppear {
             // Démarrer la partie si pas déjà fait
             if engine.p1.hand.isEmpty && engine.p2.hand.isEmpty {
@@ -180,12 +196,14 @@ struct CombatView: View {
                     // Carte en jeu
                     ZStack(alignment: .topTrailing) {
                         slotView(for: inst?.base, hp: inst?.currentHP)
-                            .dropDestination(for: Card.self) { items, _ in
-                                guard let card = items.first,
-                                      let idx = engine.current.hand.firstIndex(where: { $0.id == card.id }) else { return false }
-                                engine.playCommonToBoard(handIndex: idx, slot: i)
-                                return true
-                            }
+                            .background(
+                                GeometryReader { geo in
+                                    let frame = geo.frame(in: .named("combatArea"))
+                                    Color.clear
+                                        .onAppear { slotFrames[i] = frame }
+                                        .onChange(of: frame) { slotFrames[i] = $0 }
+                                }
+                            )
                             .overlay(
                                 VStack(spacing: 6) {
                                     // Attaquer depuis ce slot
@@ -296,8 +314,32 @@ struct CombatView: View {
                             selectedCard = c
                         }
                         .matchedGeometryEffect(id: c.id, in: drawNamespace)
-                        .opacity(animatingCard?.id == c.id ? 0 : 1)
-                        .draggable(c)
+                        .opacity((animatingCard?.id == c.id || draggingCardIndex == idx) ? 0 : 1)
+                        .gesture(
+                            DragGesture(minimumDistance: 0, coordinateSpace: .named("combatArea"))
+                                .onChanged { value in
+                                    guard value.translation.height < 0 else { return }
+                                    if draggingCardIndex == nil {
+                                        draggingCardIndex = idx
+                                    }
+                                    dragPosition = value.location
+                                    if let slot = slotFrames.first(where: { $0.value.contains(value.location) })?.key {
+                                        if hoveredSlot != slot {
+                                            hoveredSlot = slot
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        }
+                                    } else {
+                                        hoveredSlot = nil
+                                    }
+                                }
+                                .onEnded { _ in
+                                    if let slot = hoveredSlot {
+                                        engine.playCommonToBoard(handIndex: idx, slot: slot)
+                                    }
+                                    draggingCardIndex = nil
+                                    hoveredSlot = nil
+                                }
+                        )
                         .overlay(alignment: .bottom) {
                             actionButtonsForHandCard(c, index: idx)
                                 .padding(.bottom, 6)
