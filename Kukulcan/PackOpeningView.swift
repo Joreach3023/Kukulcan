@@ -10,6 +10,7 @@ struct PackOpeningView: View {
     @State private var packScale: CGFloat = 1.0
     @State private var packOpacity: Double = 1.0
     @State private var burst: Double = 0.0
+    @State private var selectedCard: Card? = nil
 
     var body: some View {
         ZStack {
@@ -30,6 +31,9 @@ struct PackOpeningView: View {
         }
         .animation(.default, value: stage)
         .animation(.default, value: showCards)
+        .fullScreenCover(item: $selectedCard) { card in
+            CardDetailView(card: card) { selectedCard = nil }
+        }
     }
 }
 
@@ -94,9 +98,11 @@ private extension PackOpeningView {
     @ViewBuilder
     func cardSlot(index i: Int) -> some View {
         if i < cards.count, showCards[i] {
-            CardView(card: cards[i], faceUp: true, width: 120)
-                .transition(.scale.combined(with: .opacity))
-                .shadow(color: cards[i].rarity.glow, radius: 14)
+            CardView(card: cards[i], faceUp: true, width: 120) {
+                selectedCard = cards[i]
+            }
+            .transition(.scale.combined(with: .opacity))
+            .shadow(color: cards[i].rarity.glow, radius: 14)
         } else {
             PlaceholderCard(width: 120, height: 180)
         }
