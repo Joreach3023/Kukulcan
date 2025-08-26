@@ -18,10 +18,11 @@ struct CardBackView: View {
                         .stroke(.white.opacity(0.2), lineWidth: 1)
                 )
 
-            // Petit symbole central
-            Image(systemName: "triangle.fill")
-                .font(.system(size: 42, weight: .bold))
-                .foregroundStyle(.white.opacity(0.85))
+            // Petit symbole central (soleil)
+            Image("kinich_ahau")
+                .resizable()
+                .scaledToFit()
+                .frame(width: (width ?? 140) * 0.5, height: (width ?? 140) * 0.5)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity) // s’étire dans le conteneur parent
         .clipped()
