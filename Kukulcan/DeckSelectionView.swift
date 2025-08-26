@@ -5,6 +5,7 @@ struct DeckSelectionView: View {
     @State private var selectedDeck: Deck? = nil
     @State private var selectedLevel: Int? = nil
     @State private var startCombat = false
+    @State private var showLockedAlert = false
 
     @AppStorage("max_ai_level") private var maxAIUnlocked = 1
     @AppStorage("ai_levels_won_mask") private var aiLevelsWonMask: Int = 0
@@ -18,8 +19,13 @@ struct DeckSelectionView: View {
                     Section("Niveau IA") {
                         ForEach(1...5, id: \.self) { lvl in
                             let reward = levelRewards[lvl - 1]
+                            let locked = lvl > maxAIUnlocked
                             Button {
-                                selectedLevel = lvl
+                                if locked {
+                                    showLockedAlert = true
+                                } else {
+                                    selectedLevel = lvl
+                                }
                             } label: {
                                 HStack {
                                     Text("Niveau \(lvl)")
@@ -27,8 +33,8 @@ struct DeckSelectionView: View {
                                     CardView(card: reward, faceUp: true, width: 50)
                                         .opacity(levelWon(lvl) ? 0.3 : 1)
                                 }
+                                .opacity(locked ? 0.5 : 1)
                             }
-                            .disabled(lvl > maxAIUnlocked)
                             .listRowBackground(selectedLevel == lvl ? Color.blue.opacity(0.2) : nil)
                         }
                     }
@@ -57,10 +63,17 @@ struct DeckSelectionView: View {
             }
             .navigationTitle("Choisir un deck")
             .toolbar {
-                NavigationLink {
-                    DecksView()
-                } label: {
-                    Label("Decks", systemImage: "folder")
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    NavigationLink {
+                        DecksView()
+                    } label: {
+                        Label("Decks", systemImage: "folder")
+                    }
+                    NavigationLink {
+                        RulesView()
+                    } label: {
+                        Label("Règles", systemImage: "questionmark.circle")
+                    }
                 }
             }
             .navigationDestination(isPresented: $startCombat) {
@@ -75,6 +88,9 @@ struct DeckSelectionView: View {
                     )
                 }
             }
+        }
+        .alert("Tu dois terminer le niveau précédent.", isPresented: $showLockedAlert) {
+            Button("OK", role: .cancel) {}
         }
     }
 
