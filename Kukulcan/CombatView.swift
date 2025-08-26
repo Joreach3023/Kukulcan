@@ -24,6 +24,9 @@ struct CombatView: View {
 
     @State private var selectedCard: Card? = nil
 
+    @Namespace private var drawNamespace
+    @State private var animatingCard: Card? = nil
+
     var body: some View {
         ZStack {
             // Fond visuel du combat
@@ -52,6 +55,14 @@ struct CombatView: View {
             // Démarrer la partie si pas déjà fait
             if engine.p1.hand.isEmpty && engine.p2.hand.isEmpty {
                 engine.start()
+            }
+        }
+        .onChange(of: engine.lastDrawnCard) { card in
+            guard let card else { return }
+            animatingCard = card
+            withAnimation(.easeInOut(duration: 0.6)) { }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                animatingCard = nil
             }
         }
         .sheet(isPresented: $showTargetPickerForRitual) {
@@ -105,6 +116,21 @@ struct CombatView: View {
     private var opponentStrip: some View {
         VStack(spacing: 6) {
             Text("Plateau adverse").font(.caption).foregroundStyle(.secondary)
+
+            // Pioche adverse
+            HStack(spacing: 8) {
+                Text("Pioche :").font(.caption)
+                ZStack {
+                    if engine.opponent.deck.isEmpty {
+                        emptySlot(width: 46, height: 64)
+                    } else {
+                        CardBackView().frame(width: 46, height: 64)
+                        Text("\(engine.opponent.deck.count)")
+                            .font(.caption.bold())
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
 
             // Dieu adverse
             HStack(spacing: 8) {
@@ -166,6 +192,24 @@ struct CombatView: View {
     // MARK: - Zones spéciales (Dieu / Sacrifice / Défausse)
     private var zonesRow: some View {
         HStack(spacing: 10) {
+            VStack(spacing: 6) {
+                Text("Pioche").font(.caption).foregroundStyle(.secondary)
+                ZStack {
+                    if engine.current.deck.isEmpty {
+                        emptySlot(width: 92, height: 128)
+                    } else {
+                        CardBackView().frame(width: 92, height: 128)
+                        Text("\(engine.current.deck.count)")
+                            .font(.headline.bold())
+                            .foregroundStyle(.white)
+                    }
+                    if let animatingCard {
+                        CardBackView().frame(width: 92, height: 128)
+                            .matchedGeometryEffect(id: animatingCard.id, in: drawNamespace)
+                    }
+                }
+            }
+
             VStack(spacing: 6) {
                 Text("Ton dieu").font(.caption).foregroundStyle(.secondary)
                 ZStack(alignment: .topTrailing) {
@@ -229,6 +273,8 @@ struct CombatView: View {
                         CardView(card: c, faceUp: true, width: 120) {
                             selectedCard = c
                         }
+                        .matchedGeometryEffect(id: c.id, in: drawNamespace)
+                        .opacity(animatingCard?.id == c.id ? 0 : 1)
                         .draggable(c)
                         .overlay(alignment: .bottom) {
                             actionButtonsForHandCard(c, index: idx)

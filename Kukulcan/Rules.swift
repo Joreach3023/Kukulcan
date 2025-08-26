@@ -83,11 +83,15 @@ struct PlayerState: Codable {
     var blood: Int = 0                                             // ressource
     var pendingBonusBlood: Int = 0                                 // bonus du rituel Blood Altar (réinitialisé fin de tour)
 
-    mutating func draw(_ n: Int = 1) {
+    mutating func draw(_ n: Int = 1) -> [Card] {
+        var drawn: [Card] = []
         for _ in 0..<n {
             if deck.isEmpty { break }
-            hand.append(deck.removeFirst())
+            let c = deck.removeFirst()
+            hand.append(c)
+            drawn.append(c)
         }
+        return drawn
     }
 }
 
@@ -105,6 +109,7 @@ final class GameEngine: ObservableObject {
 
     @Published private(set) var currentPlayerIsP1: Bool = true
     @Published private(set) var log: [String] = []
+    @Published var lastDrawnCard: Card? = nil
 
     var current: PlayerState { currentPlayerIsP1 ? p1 : p2 }
     var opponent: PlayerState { currentPlayerIsP1 ? p2 : p1 }
@@ -117,7 +122,7 @@ final class GameEngine: ObservableObject {
     func start(mulligan: Int = 5) {
         // Mélange très simple
         p1.deck.shuffle(); p2.deck.shuffle()
-        p1.draw(mulligan); p2.draw(mulligan)
+        _ = p1.draw(mulligan); _ = p2.draw(mulligan)
         log.removeAll()
         log.append("La partie commence. \(p1.name) joue en premier.")
     }
@@ -330,7 +335,13 @@ final class GameEngine: ObservableObject {
     }
 
     private func drawForCurrent(_ n: Int) {
-        if currentPlayerIsP1 { p1.draw(n) } else { p2.draw(n) }
+        if currentPlayerIsP1 {
+            let d = p1.draw(n)
+            lastDrawnCard = d.last
+        } else {
+            let d = p2.draw(n)
+            lastDrawnCard = d.last
+        }
     }
 
     // MARK: - IA facile
