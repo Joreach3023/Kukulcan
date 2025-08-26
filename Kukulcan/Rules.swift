@@ -1,5 +1,14 @@
 import Foundation
 
+#if !canImport(SwiftUI) && !canImport(Combine)
+@propertyWrapper
+struct Published<Value> {
+    var wrappedValue: Value
+    init(wrappedValue: Value) { self.wrappedValue = wrappedValue }
+}
+protocol ObservableObject {}
+#endif
+
 // MARK: - Domain
 
 enum Rarity: String, Codable { case common, rare, epic, legendary }
@@ -176,6 +185,7 @@ final class GameEngine: ObservableObject {
                 cp.pendingBonusBlood = 0
                 cp.sacrificeSlot = inst
                 cp.discard.append(inst.base)
+                cp.discard.append(c)
                 setCurrent(cp, log: "\(activeName()) utilise Couteau d’obsidienne sur \(inst.base.name) → +\(gain) Sang (total \(cp.blood)).")
                 // pioche 2
                 drawForCurrent(2)
@@ -420,7 +430,7 @@ struct StarterFactory {
     }
 
     static func randomDeck() -> [Card] {
-        CardsDB.battleDeck
+        playerDeck()
     }
 }
 
