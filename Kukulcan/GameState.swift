@@ -88,8 +88,7 @@ final class GameState: ObservableObject {
     private func aiRespond(to laneIndex: Int) {
         guard lanes[laneIndex].ai == nil, !aiHand.isEmpty else { return }
 
-        let pElem = lanes[laneIndex].player!.element
-        let chosen: Card = aiHand.first(where: { $0.element.beats(pElem) }) ?? aiHand.randomElement()!
+        let chosen: Card = aiHand.randomElement()!
         lanes[laneIndex].ai = chosen
         aiHand.removeAll { $0.id == chosen.id }
 
@@ -103,10 +102,7 @@ final class GameState: ObservableObject {
     private func resolveIfReady(_ i: Int) {
         guard let p = lanes[i].player, let a = lanes[i].ai else { return }
         let winner: Int = {
-            if p.element == a.element {
-                return p.attack == a.attack ? 0 : (p.attack > a.attack ? 1 : -1)
-            }
-            return p.element.beats(a.element) ? 1 : -1
+            return p.attack == a.attack ? 0 : (p.attack > a.attack ? 1 : -1)
         }()
         switch winner {
         case 1: playerScore += 1; message = "Tu gagnes la lane \(i+1) !"
@@ -141,7 +137,7 @@ final class GameState: ObservableObject {
             Card(
                 name: "Kinich Ahau",
                 type: .god,
-                element: .fire,
+                element: .plant,
                 rarity: .legendary,
                 imageName: "kinich_ahau",
                 attack: 6,
@@ -154,7 +150,7 @@ final class GameState: ObservableObject {
             Card(
                 name: "Buluc Chabtan",
                 type: .god,
-                element: .fire,
+                element: .plant,
                 rarity: .legendary,
                 imageName: "buluc_chabtan",
                 attack: 4,
@@ -167,7 +163,7 @@ final class GameState: ObservableObject {
             Card(
                 name: "Chaac",
                 type: .god,
-                element: .water,
+                element: .plant,
                 rarity: .legendary,
                 imageName: "chaac",
                 attack: 6,
@@ -175,12 +171,12 @@ final class GameState: ObservableObject {
                 ritual: nil,
                 bloodCost: 7,
                 effect: "Invocation : la pluie et la foudre répondent.",
-                lore: "D’un coup de hache de foudre, Chaac fend les nuages et fait tomber la pluie qui nourrit la terre."
+                lore: "D’un coup de hache de foudre, Chaac fend les nuages et fait tomber une pluie nourricière."
             ),
             Card(
                 name: "Ix Chel",
                 type: .god,
-                element: .water,
+                element: .plant,
                 rarity: .legendary,
                 imageName: "ix_chel",
                 attack: 4,
