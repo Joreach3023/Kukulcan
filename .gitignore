@@ -21,3 +21,6 @@ Carthage/Build/
 # Secrets/API keys
 **/Secrets*.swift
 *.env
+
+# Audio assets
+*.wav

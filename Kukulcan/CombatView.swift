@@ -94,6 +94,10 @@ struct CombatView: View {
             if engine.p1.hand.isEmpty && engine.p2.hand.isEmpty {
                 engine.start()
             }
+            AudioManager.shared.play(.combat)
+        }
+        .onDisappear {
+            AudioManager.shared.stop()
         }
         .onChange(of: engine.lastDrawnCard) { card in
             guard let card else { return }
