@@ -23,28 +23,33 @@ struct CombatView: View {
     @State private var attackFromSlot: Int? = nil  // -1 = dieu
 
     var body: some View {
-        VStack(spacing: 10) {
-            header
+        ZStack {
+            // Fond visuel du combat
+            CombatBackground()
 
-            // Opposant (aperçu simple)
-            opponentStrip
+            VStack(spacing: 10) {
+                header
 
-            Divider().opacity(0.3)
+                // Opposant (aperçu simple)
+                opponentStrip
 
-            // Board du joueur (4 slots)
-            boardArea
+                Divider().opacity(0.3)
 
-            // Zone Dieu + Sacrifice + Défausse
-            zonesRow
+                // Board du joueur (4 slots)
+                boardArea
 
-            // Main du joueur
-            handStrip
+                // Zone Dieu + Sacrifice + Défausse
+                zonesRow
 
-            // Log + actions de tour
-            footerControls
+                // Main du joueur
+                handStrip
+
+                // Log + actions de tour
+                footerControls
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
         .onAppear {
             // Démarrer la partie si pas déjà fait
             if engine.p1.hand.isEmpty && engine.p2.hand.isEmpty {

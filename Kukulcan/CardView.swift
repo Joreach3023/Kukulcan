@@ -40,7 +40,8 @@ struct CardView: View {
     var body: some View {
         let h = width * ratio
 
-        ZStack {
+        // Contenu principal de la carte
+        let core = ZStack {
             // Fond / cadre carte
             RoundedRectangle(cornerRadius: 18)
                 .fill(.ultraThinMaterial)
@@ -72,7 +73,6 @@ struct CardView: View {
                         CardBackView()
                             .frame(width: width, height: h - topHeight - bottomHeight)
                     }
-
                 }
 
                 // Bandeau bas (effet)
@@ -86,7 +86,15 @@ struct CardView: View {
         }
         .frame(width: width, height: h)
         .contentShape(RoundedRectangle(cornerRadius: 18))
-        .onTapGesture { onTap?() }
+
+        // N’applique le geste de tap que si un callback existe.
+        return Group {
+            if let onTap {
+                core.onTapGesture { onTap() }
+            } else {
+                core
+            }
+        }
     }
 
     // MARK: - Layout helpers

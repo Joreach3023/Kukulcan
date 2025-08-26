@@ -374,7 +374,7 @@ struct StarterFactory {
         // Dieux (tes assets existants)
         d += [god("Ix Chel", atk: 6, hp: 7, el: .water, img: "ix_chel", cost: 7,
                   lore: "Déesse de la lune et des marées, elle ourdit les destins comme on tisse un voile d’argent.")]
-        d += [god("Kukulcan", atk: 7, hp: 8, el: .plant, img: "kuklcan", cost: 7,
+        d += [god("Kukulcan", atk: 7, hp: 8, el: .plant, img: "kukulcan", cost: 7,
                   lore: "Serpent à plumes, cyclone vivant des jungles oubliées.")]
         return d
     }
