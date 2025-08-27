@@ -188,6 +188,7 @@ final class CollectionStore: ObservableObject {
     func resetCollection() {
         owned.removeAll()
         decks.removeAll()
+        gold = 0
     }
 }
 
