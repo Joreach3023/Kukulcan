@@ -32,6 +32,13 @@ struct MainTabView: View {
             }
         }
         .tint(.orange)
+        .overlay(alignment: .topTrailing) {
+            Label("\(collection.gold)", systemImage: "creditcard")
+                .padding(8)
+                .background(.ultraThinMaterial)
+                .clipShape(Capsule())
+                .padding()
+        }
     }
 }
 
