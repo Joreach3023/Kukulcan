@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PacksView: View {
     @EnvironmentObject var collection: CollectionStore
+    private let packCost = 100
 
     @State private var lastPulled: [Card] = []
     @State private var showOpening = false
@@ -38,10 +39,21 @@ struct PacksView: View {
                 }
                 .padding(.horizontal)
 
+                // Affichage de l'or et du coût
+                HStack {
+                    Text("Or : \(collection.gold)")
+                    Spacer()
+                    Text("Coût : \(packCost)")
+                }
+                .padding(.horizontal)
+
                 // Bouton ouvrir
                 Button {
-                    lastPulled = collection.openPack()   // ⬅️ remplace drawMixedPack()
-                    showOpening = true
+                    if collection.gold >= packCost {
+                        collection.spendGold(packCost)
+                        lastPulled = collection.openPack()
+                        showOpening = true
+                    }
                 } label: {
                     Label("Ouvrir un pack", systemImage: "sparkles")
                         .font(.headline)
@@ -50,6 +62,7 @@ struct PacksView: View {
                         .foregroundStyle(.white)
                         .shadow(radius: 6)
                 }
+                .disabled(collection.gold < packCost)
 
                 // Aperçu des cartes tirées
                 if !lastPulled.isEmpty {

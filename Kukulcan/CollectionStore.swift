@@ -17,12 +17,28 @@ final class CollectionStore: ObservableObject {
         didSet { saveDecks() }
     }
 
+    // Monnaie du joueur
+    @AppStorage("player_gold_v1") var gold: Int = 0
+
     init() {
         load()
         loadDecks()
     }
 
     // MARK: - Packs
+
+    /// Dépense de l'or du joueur
+    func spendGold(_ amount: Int) {
+        gold = max(gold - amount, 0)
+    }
+
+    /// Achète et ouvre un pack si assez d'or
+    @discardableResult
+    func buyPack(cost: Int) -> [Card]? {
+        guard gold >= cost else { return nil }
+        spendGold(cost)
+        return openPack()
+    }
 
     /// Ouvre un pack (mélange commune/rituel/dieu selon `CardsDB.mixedPack`)
     /// et ajoute les cartes tirées à la collection.
