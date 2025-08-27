@@ -13,7 +13,6 @@ struct DeckSelectionView: View {
     @AppStorage("ai_levels_won_mask") private var aiLevelsWonMask: Int = 0
 
     private let levelRewards = Array(CardsDB.gods.prefix(5))
-    private let goldPerLevel = 50
 
     var body: some View {
         NavigationStack {
@@ -115,7 +114,7 @@ struct DeckSelectionView: View {
             }
             let reward = levelRewards[level - 1]
             collection.add([reward])
-            let goldReward = goldPerLevel * level
+            let goldReward = 50 * level
             collection.addGold(goldReward)
             lastGoldReward = goldReward
             showGoldAlert = true
