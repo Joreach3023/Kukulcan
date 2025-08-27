@@ -6,11 +6,14 @@ struct DeckSelectionView: View {
     @State private var selectedLevel: Int? = nil
     @State private var startCombat = false
     @State private var showLockedAlert = false
+    @State private var showGoldAlert = false
+    @State private var lastGoldReward = 0
 
     @AppStorage("max_ai_level") private var maxAIUnlocked = 1
     @AppStorage("ai_levels_won_mask") private var aiLevelsWonMask: Int = 0
 
     private let levelRewards = Array(CardsDB.gods.prefix(5))
+    private let goldPerLevel = 50
 
     var body: some View {
         NavigationStack {
@@ -89,6 +92,11 @@ struct DeckSelectionView: View {
                 }
             }
         }
+        .alert("Récompense", isPresented: $showGoldAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Tu reçois \(lastGoldReward) or")
+        }
         .alert("Tu dois terminer le niveau précédent.", isPresented: $showLockedAlert) {
             Button("OK", role: .cancel) {}
         }
@@ -107,6 +115,10 @@ struct DeckSelectionView: View {
             }
             let reward = levelRewards[level - 1]
             collection.add([reward])
+            let goldReward = goldPerLevel * level
+            collection.addGold(goldReward)
+            lastGoldReward = goldReward
+            showGoldAlert = true
         }
     }
 }

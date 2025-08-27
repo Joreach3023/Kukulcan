@@ -6,6 +6,7 @@ final class CollectionStore: ObservableObject {
     // Persistance locale
     @AppStorage("owned_cards_v2") private var ownedData: Data = Data()
     @AppStorage("player_decks_v1") private var decksData: Data = Data()
+    @AppStorage("player_gold_v1") private var goldData: Int = 0
 
     // Cartes possédées
     @Published var owned: [Card] = [] {
@@ -17,9 +18,15 @@ final class CollectionStore: ObservableObject {
         didSet { saveDecks() }
     }
 
+    // Or du joueur
+    @Published var gold: Int = 0 {
+        didSet { goldData = gold }
+    }
+
     init() {
         load()
         loadDecks()
+        gold = goldData
     }
 
     // MARK: - Packs
@@ -54,6 +61,11 @@ final class CollectionStore: ObservableObject {
     /// Ajoute manuellement des cartes à la collection
     func add(_ cards: [Card]) {
         owned.append(contentsOf: cards)
+    }
+
+    /// Ajoute de l'or à la collection
+    func addGold(_ amount: Int) {
+        gold += amount
     }
 
     // MARK: - Helpers d’affichage
@@ -121,6 +133,7 @@ final class CollectionStore: ObservableObject {
     func resetCollection() {
         owned.removeAll()
         decks.removeAll()
+        gold = 0
     }
 }
 
