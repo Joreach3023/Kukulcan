@@ -73,11 +73,13 @@ final class CollectionStore: ObservableObject {
 
     /// Gagne de l'or
     func earnGold(_ amount: Int) {
+        guard amount >= 0 else { return }
         gold = max(gold + amount, 0)
     }
 
     /// Dépense de l'or du joueur
     func spendGold(_ amount: Int) {
+        guard amount >= 0 else { return }
         gold = max(gold - amount, 0)
     }
 
