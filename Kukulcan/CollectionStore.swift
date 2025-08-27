@@ -1,11 +1,35 @@
 import Foundation
+#if canImport(SwiftUI)
 import SwiftUI
+#else
+@propertyWrapper
+struct AppStorage<Value> {
+    private let key: String
+    private let defaultValue: Value
+
+    init(wrappedValue: Value, _ key: String) {
+        self.key = key
+        self.defaultValue = wrappedValue
+        UserDefaults.standard.register(defaults: [key: wrappedValue])
+    }
+
+    var wrappedValue: Value {
+        get {
+            UserDefaults.standard.object(forKey: key) as? Value ?? defaultValue
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: key)
+        }
+    }
+}
+#endif
 
 /// Stocke la collection du joueur + ouverture de packs + persistance JSON
 final class CollectionStore: ObservableObject {
     // Persistance locale
     @AppStorage("owned_cards_v2") private var ownedData: Data = Data()
     @AppStorage("player_decks_v1") private var decksData: Data = Data()
+    @AppStorage("player_gold_v1") private var storedGold: Int = 0
 
     // Cartes possédées
     @Published var owned: [Card] = [] {
@@ -17,9 +41,15 @@ final class CollectionStore: ObservableObject {
         didSet { saveDecks() }
     }
 
+    // Or du joueur
+    @Published var gold: Int = 0 {
+        didSet { storedGold = gold }
+    }
+
     init() {
         load()
         loadDecks()
+        gold = storedGold
     }
 
     // MARK: - Packs
@@ -54,6 +84,26 @@ final class CollectionStore: ObservableObject {
     /// Ajoute manuellement des cartes à la collection
     func add(_ cards: [Card]) {
         owned.append(contentsOf: cards)
+    }
+
+    /// Ajoute de l'or au joueur
+    func addGold(_ amount: Int) {
+        gold += amount
+    }
+
+    /// Dépense de l'or si possible
+    @discardableResult
+    func spendGold(_ amount: Int) -> Bool {
+        guard gold >= amount else { return false }
+        gold -= amount
+        return true
+    }
+
+    /// Achète et ouvre un pack si suffisamment d'or. Retourne `nil` si achat impossible.
+    @discardableResult
+    func buyPack(cost: Int = 100) -> [Card]? {
+        guard spendGold(cost) else { return nil }
+        return openPack()
     }
 
     // MARK: - Helpers d’affichage
@@ -121,6 +171,7 @@ final class CollectionStore: ObservableObject {
     func resetCollection() {
         owned.removeAll()
         decks.removeAll()
+        gold = 0
     }
 }
 

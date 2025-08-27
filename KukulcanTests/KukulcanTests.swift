@@ -123,4 +123,41 @@ struct KukulcanTests {
         #expect(!Deck(name: "gods", cards: [g1, g2]).isValid())
         #expect(Deck(name: "one god", cards: [g1, c1]).isValid())
     }
+
+    /// Gold should persist across instances, spending should reduce it and buying packs should fail if insufficient.
+    @Test func testGoldSpendingAndSaving() {
+        var store = CollectionStore()
+        store.resetCollection() // clean state
+
+        // Add and spend gold
+        store.addGold(200)
+        #expect(store.spendGold(150))
+        #expect(store.gold == 50)
+
+        // Gold should persist after reloading
+        var reloaded = CollectionStore()
+        #expect(reloaded.gold == 50)
+
+        // Cannot buy pack without enough gold
+        let attempt = reloaded.buyPack(cost: 100)
+        #expect(attempt == nil)
+        #expect(reloaded.owned.isEmpty)
+        #expect(reloaded.gold == 50)
+
+        // Add enough gold and buy a pack
+        reloaded.addGold(100)
+        let pack = reloaded.buyPack(cost: 100)
+        #expect(pack?.count == 3)
+        #expect(reloaded.gold == 50)
+
+        // Reset should clear gold and collection
+        reloaded.resetCollection()
+        #expect(reloaded.gold == 0)
+        #expect(reloaded.owned.isEmpty)
+
+        // Reloaded instance after reset should also have zero gold
+        let fresh = CollectionStore()
+        #expect(fresh.gold == 0)
+        #expect(fresh.owned.isEmpty)
+    }
 }
