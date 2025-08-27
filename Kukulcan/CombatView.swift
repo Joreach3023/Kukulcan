@@ -7,11 +7,13 @@ struct CombatView: View {
     @StateObject private var engine: GameEngine
     private let aiLevel: Int
     var onWin: ((Int) -> Void)? = nil
+    var onLoss: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
-    init(engine: GameEngine? = nil, aiLevel: Int = 1, onWin: ((Int) -> Void)? = nil) {
+    init(engine: GameEngine? = nil, aiLevel: Int = 1, onWin: ((Int) -> Void)? = nil, onLoss: (() -> Void)? = nil) {
         self.aiLevel = aiLevel
         self.onWin = onWin
+        self.onLoss = onLoss
         if let e = engine {
             _engine = StateObject(wrappedValue: e)
         } else {
@@ -146,6 +148,7 @@ struct CombatView: View {
         }
         .onChange(of: engine.p1.hp) { hp in
             if hp <= 0 {
+                onLoss?()
                 dismiss()
             }
         }

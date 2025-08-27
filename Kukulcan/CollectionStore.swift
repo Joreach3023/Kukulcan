@@ -27,6 +27,11 @@ final class CollectionStore: ObservableObject {
 
     // MARK: - Packs
 
+    /// Gagne de l'or
+    func earnGold(_ amount: Int) {
+        gold = max(gold + amount, 0)
+    }
+
     /// Dépense de l'or du joueur
     func spendGold(_ amount: Int) {
         gold = max(gold - amount, 0)
