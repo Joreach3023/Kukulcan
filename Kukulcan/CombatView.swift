@@ -278,7 +278,7 @@ struct CombatView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     // MARK: - Zones spéciales (Dieu / Sacrifice / Défausse)
@@ -352,7 +352,7 @@ struct CombatView: View {
             }
             Spacer()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     // MARK: - Main du joueur
