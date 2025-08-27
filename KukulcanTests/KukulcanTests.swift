@@ -131,7 +131,7 @@ struct KukulcanTests {
         store.earnGold(10)
         #expect(store.gold == 10)
         store.earnGold(-20)
-        #expect(store.gold == 0)
+        #expect(store.gold == 10)
     }
 
     /// Dépenser de l'or réduit la réserve mais ne va pas sous zéro.
@@ -140,6 +140,8 @@ struct KukulcanTests {
         let store = CollectionStore(store: suite)
         store.earnGold(10)
         store.spendGold(4)
+        #expect(store.gold == 6)
+        store.spendGold(-3)
         #expect(store.gold == 6)
         store.spendGold(10)
         #expect(store.gold == 0)
