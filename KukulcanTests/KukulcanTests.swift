@@ -123,4 +123,35 @@ struct KukulcanTests {
         #expect(!Deck(name: "gods", cards: [g1, g2]).isValid())
         #expect(Deck(name: "one god", cards: [g1, c1]).isValid())
     }
+
+    /// Gagner de l'or augmente la réserve sans passer en négatif.
+    @Test func earningGoldIncreasesBalance() {
+        let suite = UserDefaults(suiteName: UUID().uuidString)!
+        let store = CollectionStore(store: suite)
+        store.earnGold(10)
+        #expect(store.gold == 10)
+        store.earnGold(-20)
+        #expect(store.gold == 0)
+    }
+
+    /// Dépenser de l'or réduit la réserve mais ne va pas sous zéro.
+    @Test func spendingGoldDecreasesBalance() {
+        let suite = UserDefaults(suiteName: UUID().uuidString)!
+        let store = CollectionStore(store: suite)
+        store.earnGold(10)
+        store.spendGold(4)
+        #expect(store.gold == 6)
+        store.spendGold(10)
+        #expect(store.gold == 0)
+    }
+
+    /// L'or doit persister entre différentes instances de `CollectionStore`.
+    @Test func goldPersistsAcrossInstances() {
+        let suiteName = UUID().uuidString
+        let suite = UserDefaults(suiteName: suiteName)!
+        var store = CollectionStore(store: suite)
+        store.earnGold(5)
+        let reloaded = CollectionStore(store: UserDefaults(suiteName: suiteName)!)
+        #expect(reloaded.gold == 5)
+    }
 }

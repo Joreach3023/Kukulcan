@@ -17,7 +17,7 @@ let package = Package(
         .target(
             name: "Kukulcan",
             path: "Kukulcan",
-            sources: ["Rules.swift", "Deck.swift"]
+            sources: ["Rules.swift", "Deck.swift", "CollectionStore.swift", "CardsDatabase.swift"]
         ),
         .testTarget(
             name: "KukulcanTests",

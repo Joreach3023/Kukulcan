@@ -1,5 +1,46 @@
 import Foundation
+#if canImport(SwiftUI)
 import SwiftUI
+#endif
+
+#if !canImport(SwiftUI) && !canImport(Combine)
+@propertyWrapper
+struct AppStorage<Value> {
+    private let key: String
+    private var store: UserDefaults
+    private var defaultValue: Value
+
+    init(wrappedValue: Value, _ key: String, store: UserDefaults = .standard) {
+        self.key = key
+        self.store = store
+        self.defaultValue = wrappedValue
+        // initialise default in store if absent
+        if store.object(forKey: key) == nil {
+            if let data = wrappedValue as? Data {
+                store.set(data, forKey: key)
+            } else {
+                store.set(wrappedValue, forKey: key)
+            }
+        }
+    }
+
+    var wrappedValue: Value {
+        get {
+            if Value.self == Data.self {
+                return (store.data(forKey: key) as? Value) ?? defaultValue
+            }
+            return (store.object(forKey: key) as? Value) ?? defaultValue
+        }
+        set {
+            if let data = newValue as? Data {
+                store.set(data, forKey: key)
+            } else {
+                store.set(newValue, forKey: key)
+            }
+        }
+    }
+}
+#endif
 
 /// Stocke la collection du joueur + ouverture de packs + persistance JSON
 final class CollectionStore: ObservableObject {
@@ -20,7 +61,10 @@ final class CollectionStore: ObservableObject {
     // Monnaie du joueur
     @AppStorage("player_gold_v1") var gold: Int = 0
 
-    init() {
+    init(store: UserDefaults = .standard) {
+        _ownedData = AppStorage(wrappedValue: Data(), "owned_cards_v2", store: store)
+        _decksData = AppStorage(wrappedValue: Data(), "player_decks_v1", store: store)
+        _gold = AppStorage(wrappedValue: 0, "player_gold_v1", store: store)
         load()
         loadDecks()
     }
