@@ -11,6 +11,8 @@ struct DeckSelectionView: View {
     @AppStorage("ai_levels_won_mask") private var aiLevelsWonMask: Int = 0
 
     private let levelRewards = Array(CardsDB.gods.prefix(5))
+    private let winGoldReward = 50
+    private let lossGoldReward = 20
 
     var body: some View {
         NavigationStack {
@@ -84,7 +86,8 @@ struct DeckSelectionView: View {
                             p2: PlayerState(name: "IA", deck: StarterFactory.randomDeck())
                         ),
                         aiLevel: lvl,
-                        onWin: { handleWin(level: $0) }
+                        onWin: { handleWin(level: $0) },
+                        onLoss: { handleLoss() }
                     )
                 }
             }
@@ -99,6 +102,7 @@ struct DeckSelectionView: View {
     }
 
     private func handleWin(level: Int) {
+        collection.earnGold(winGoldReward)
         let mask = 1 << (level - 1)
         if aiLevelsWonMask & mask == 0 {
             aiLevelsWonMask |= mask
@@ -108,5 +112,9 @@ struct DeckSelectionView: View {
             let reward = levelRewards[level - 1]
             collection.add([reward])
         }
+    }
+
+    private func handleLoss() {
+        collection.earnGold(lossGoldReward)
     }
 }
