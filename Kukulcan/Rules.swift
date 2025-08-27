@@ -134,6 +134,12 @@ final class GameEngine: ObservableObject {
 
     // MARK: setup
     func start(mulligan: Int = 5) {
+        // Réinitialise les zones et ressources pour les deux joueurs
+        p1.sacrificeSlot = nil; p1.godSlot = nil
+        p2.sacrificeSlot = nil; p2.godSlot = nil
+        p1.blood = 0; p1.pendingBonusBlood = 0
+        p2.blood = 0; p2.pendingBonusBlood = 0
+
         // Mélange très simple
         p1.deck.shuffle(); p2.deck.shuffle()
         _ = p1.draw(mulligan); _ = p2.draw(mulligan)
@@ -426,13 +432,16 @@ final class GameEngine: ObservableObject {
     private func performHardAITurn() {
         guard !currentPlayerIsP1 else { return }
         // Tente d'invoquer un dieu, sinon sacrifie pour gagner du sang
-        if let gIdx = current.hand.firstIndex(where: { $0.type == .god }) {
+        if current.godSlot == nil, let gIdx = current.hand.firstIndex(where: { $0.type == .god }) {
             let god = current.hand[gIdx]
             if current.blood >= god.bloodCost {
                 invokeGod(handIndex: gIdx)
             } else if let sac = current.hand.firstIndex(where: { $0.type == .common }) {
                 sacrificeCommon(handIndex: sac)
             }
+        } else if current.blood < 3, let sac = current.hand.firstIndex(where: { $0.type == .common }) {
+            // Accumule du sang en prévision
+            sacrificeCommon(handIndex: sac)
         }
         performMediumAITurn()
     }

@@ -215,6 +215,17 @@ struct CombatView: View {
                 slotView(for: engine.opponent.godSlot?.base, hp: engine.opponent.godSlot?.currentHP)
             }
 
+            // Sacrifice adverse
+            HStack(spacing: 8) {
+                Text("Sacrifice :").font(.caption)
+                if let inst = engine.opponent.sacrificeSlot {
+                    CardView(card: inst.base, faceUp: true, width: slotCardWidth)
+                        .rotationEffect(.degrees(90))
+                } else {
+                    emptySlot(width: slotCardWidth, height: slotCardHeight)
+                }
+            }
+
             // Lanes adverses
             HStack(spacing: 8) {
                 ForEach(0..<4) { i in
