@@ -87,7 +87,9 @@ struct DeckSelectionView: View {
                         ),
                         aiLevel: lvl,
                         onWin: { handleWin(level: $0) },
-                        onLoss: { handleLoss() }
+                        onLoss: { handleLoss() },
+                        winGold: winGoldReward,
+                        lossGold: lossGoldReward
                     )
                 }
             }

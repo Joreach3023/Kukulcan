@@ -2,18 +2,28 @@ import SwiftUI
 import UIKit
 import AudioToolbox
 
+private enum CombatOutcome {
+    case win, loss
+}
+
 struct CombatView: View {
     // Fournis un engine depuis l’extérieur si tu veux (collection/IA), sinon starter par défaut
     @StateObject private var engine: GameEngine
     private let aiLevel: Int
     var onWin: ((Int) -> Void)? = nil
     var onLoss: (() -> Void)? = nil
+    private let winGold: Int
+    private let lossGold: Int
     @Environment(\.dismiss) private var dismiss
 
-    init(engine: GameEngine? = nil, aiLevel: Int = 1, onWin: ((Int) -> Void)? = nil, onLoss: (() -> Void)? = nil) {
+    @State private var outcome: CombatOutcome? = nil
+
+    init(engine: GameEngine? = nil, aiLevel: Int = 1, onWin: ((Int) -> Void)? = nil, onLoss: (() -> Void)? = nil, winGold: Int = 0, lossGold: Int = 0) {
         self.aiLevel = aiLevel
         self.onWin = onWin
         self.onLoss = onLoss
+        self.winGold = winGold
+        self.lossGold = lossGold
         if let e = engine {
             _engine = StateObject(wrappedValue: e)
         } else {
@@ -147,18 +157,26 @@ struct CombatView: View {
             CardDetailView(card: card) { selectedCard = nil }
         }
         .onChange(of: engine.p1.hp) { hp in
-            if hp <= 0 {
+            if hp <= 0 && outcome == nil {
+                outcome = .loss
                 onLoss?()
-                dismiss()
             }
         }
         .onChange(of: engine.p2.hp) { hp in
-            if hp <= 0 {
+            if hp <= 0 && outcome == nil {
+                outcome = .win
                 onWin?(aiLevel)
-                dismiss()
             }
         }
         .coordinateSpace(name: "combatArea")
+        .overlay {
+            if let outcome {
+                let gold = outcome == .win ? winGold : lossGold
+                CombatResultView(isWin: outcome == .win, gold: gold) {
+                    dismiss()
+                }
+            }
+        }
     }
 
     // MARK: - Header (scores / sang)
