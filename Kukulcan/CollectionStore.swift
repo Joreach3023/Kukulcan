@@ -94,7 +94,7 @@ final class CollectionStore: ObservableObject {
     /// Ouvre un pack (mélange commune/rituel/dieu selon `CardsDB.mixedPack`)
     /// et ajoute les cartes tirées à la collection.
     @discardableResult
-    func openPack() -> [Card] {
+    private func openPack() -> [Card] {
         // Toujours 3 cartes : 2 PEUPLE + (1 rituel 40% / sinon 1 PEUPLE) + 20% chance de remplacer par un DIEU
         var result: [Card] = []
         let commons = CardsDB.commons.shuffled()
