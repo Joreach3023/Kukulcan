@@ -156,4 +156,20 @@ struct KukulcanTests {
         let reloaded = CollectionStore(store: UserDefaults(suiteName: suiteName)!)
         #expect(reloaded.gold == 5)
     }
+
+    /// Acheter un pack consomme l'or et ajoute des cartes à la collection.
+    @Test func buyingPackConsumesGoldAndAddsCards() {
+        let suite = UserDefaults(suiteName: UUID().uuidString)!
+        let store = CollectionStore(store: suite)
+        store.earnGold(100)
+
+        let cards = store.buyPack(cost: 30)
+        #expect(cards?.count == 3)
+        #expect(store.gold == 70)
+        #expect(store.owned.count == 3)
+
+        let failed = store.buyPack(cost: 100)
+        #expect(failed == nil)
+        #expect(store.gold == 70)
+    }
 }

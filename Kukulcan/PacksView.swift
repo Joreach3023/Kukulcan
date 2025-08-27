@@ -49,9 +49,8 @@ struct PacksView: View {
 
                 // Bouton ouvrir
                 Button {
-                    if collection.gold >= packCost {
-                        collection.spendGold(packCost)
-                        lastPulled = collection.openPack()
+                    if let pulled = collection.buyPack(cost: packCost) {
+                        lastPulled = pulled
                         showOpening = true
                     }
                 } label: {
