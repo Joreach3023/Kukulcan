@@ -185,23 +185,43 @@ struct CombatView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(engine.p1.name)
                     .font(.headline)
+                    .foregroundColor(.white)
                 HStack(spacing: 10) {
-                    Label("\(engine.p1.hp)", systemImage: "heart.fill")
-                    Label("\(engine.p1.blood)", systemImage: "drop.fill")
+                    HStack(spacing: 4) {
+                        Image(systemName: "heart.fill")
+                            .foregroundColor(.green)
+                        Text("\(engine.p1.hp)")
+                            .foregroundColor(.white)
+                    }
+                    HStack(spacing: 4) {
+                        Image(systemName: "drop.fill")
+                            .foregroundColor(.red)
+                        Text("\(engine.p1.blood)")
+                            .foregroundColor(.white)
+                    }
                 }
                 .font(.subheadline)
-                .foregroundColor(.white)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
                 Text(engine.p2.name)
                     .font(.headline)
+                    .foregroundColor(.white)
                 HStack(spacing: 10) {
-                    Label("\(engine.p2.hp)", systemImage: "heart.fill")
-                    Label("\(engine.p2.blood)", systemImage: "drop.fill")
+                    HStack(spacing: 4) {
+                        Image(systemName: "heart.fill")
+                            .foregroundColor(.green)
+                        Text("\(engine.p2.hp)")
+                            .foregroundColor(.white)
+                    }
+                    HStack(spacing: 4) {
+                        Image(systemName: "drop.fill")
+                            .foregroundColor(.red)
+                        Text("\(engine.p2.blood)")
+                            .foregroundColor(.white)
+                    }
                 }
                 .font(.subheadline)
-                .foregroundColor(.white)
             }
         }
     }
@@ -468,26 +488,37 @@ struct CombatView: View {
     // MARK: - Helpers visuels
     private func slotView(for card: Card?, hp: Int?) -> some View {
         ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(card == nil ? Color.white.opacity(0.2) : Color.clear)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [6,4]))
+                        .foregroundColor(.white)
+                )
             if let card {
                 CardView(card: card, faceUp: true, width: slotCardWidth) {
                     selectedCard = card
                 }
                 .overlay(alignment: .bottomTrailing) {
-                    if let hp {
-                        Text("\(hp)❤︎")
-                            .font(.caption2.bold())
-                            .padding(6)
-                            .background(.black.opacity(0.6))
-                            .foregroundStyle(.white)
-                            .clipShape(Capsule())
-                            .padding(4)
-                    }
-                    }
-            } else {
-                emptySlot(width: slotCardWidth, height: slotCardHeight)
+                    if let hp { hpBadge(hp) }
+                }
             }
         }
         .frame(width: slotCardWidth, height: slotCardHeight)
+    }
+
+    private func hpBadge(_ hp: Int) -> some View {
+        HStack(spacing: 2) {
+            Text("\(hp)")
+                .foregroundColor(.white)
+            Image(systemName: "heart.fill")
+                .foregroundColor(.green)
+        }
+        .font(.caption2.bold())
+        .padding(6)
+        .background(.black.opacity(0.6))
+        .clipShape(Capsule())
+        .padding(4)
     }
 
     private func emptySlot(width: CGFloat, height: CGFloat) -> some View {
