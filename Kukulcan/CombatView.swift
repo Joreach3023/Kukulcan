@@ -72,8 +72,8 @@ struct CombatView: View {
                 VStack(spacing: 10) {
                     header
 
-                    // Opposant (aperçu simple)
-                    opponentStrip
+                    // Plateau adverse miroité
+                    opponentBoard
 
                     Divider().opacity(0.3)
 
@@ -228,48 +228,17 @@ struct CombatView: View {
         }
     }
 
-    // MARK: - Opponent strip (aperçu board/dieu)
-    private var opponentStrip: some View {
+    // MARK: - Plateau adverse (miroir vertical)
+    private var opponentBoard: some View {
         VStack(spacing: 6) {
-            Text("Main adverse").font(.caption).foregroundStyle(.secondary)
+            opponentZonesRow
+            opponentBoardArea
+        }
+        .rotationEffect(.degrees(180))
+    }
 
-            opponentHandRow
-
-            Text("Plateau adverse").font(.caption).foregroundStyle(.secondary)
-
-            // Pioche adverse
-            HStack(spacing: 8) {
-                Text("Pioche :").font(.caption)
-                ZStack {
-                    if engine.opponent.deck.isEmpty {
-                        emptySlot(width: deckCardWidth, height: deckCardHeight)
-                    } else {
-                        CardBackView().frame(width: deckCardWidth, height: deckCardHeight)
-                        Text("\(engine.opponent.deck.count)")
-                            .font(.caption.bold())
-                            .foregroundStyle(.white)
-                    }
-                }
-            }
-
-            // Dieu adverse
-            HStack(spacing: 8) {
-                Text("Dieu :").font(.caption)
-                slotView(for: engine.opponent.godSlot?.base, hp: engine.opponent.godSlot?.currentHP)
-            }
-
-            // Sacrifice adverse
-            HStack(spacing: 8) {
-                Text("Sacrifice :").font(.caption)
-                if let inst = engine.opponent.sacrificeSlot {
-                    CardView(card: inst.base, faceUp: true, width: slotCardWidth)
-                        .rotationEffect(.degrees(90))
-                } else {
-                    emptySlot(width: slotCardWidth, height: slotCardHeight)
-                }
-            }
-
-            // Lanes adverses
+    private var opponentBoardArea: some View {
+        VStack(spacing: 6) {
             HStack(spacing: 8) {
                 ForEach(0..<4) { i in
                     let inst = engine.opponent.board[i]
@@ -279,16 +248,36 @@ struct CombatView: View {
         }
     }
 
-    private var opponentHandRow: some View {
-        ZStack {
-            ForEach(engine.opponent.hand.indices, id: \.self) { i in
-                CardBackView(width: deckCardWidth)
-                    .rotation3DEffect(.degrees(15), axis: (x: 1, y: 0, z: 0))
-                    .rotationEffect(.degrees(Double(i - engine.opponent.hand.count/2) * 8))
-                    .offset(x: CGFloat(i - engine.opponent.hand.count/2) * 20)
+    private var opponentZonesRow: some View {
+        HStack(spacing: 10) {
+            VStack(spacing: 6) {
+                ZStack {
+                    if engine.opponent.deck.isEmpty {
+                        emptySlot(width: deckCardWidth, height: deckCardHeight)
+                    } else {
+                        CardBackView().frame(width: deckCardWidth, height: deckCardHeight)
+                        Text("\(engine.opponent.deck.count)")
+                            .font(.headline.bold())
+                            .foregroundStyle(.white)
+                            .rotationEffect(.degrees(180))
+                    }
+                }
+            }
+
+            VStack(spacing: 6) {
+                slotView(for: engine.opponent.godSlot?.base, hp: engine.opponent.godSlot?.currentHP)
+                    .frame(width: slotCardWidth, height: slotCardHeight)
+            }
+
+            VStack(spacing: 6) {
+                if let inst = engine.opponent.sacrificeSlot {
+                    CardView(card: inst.base, faceUp: true, width: slotCardWidth)
+                        .rotationEffect(.degrees(90))
+                } else {
+                    emptySlot(width: slotCardWidth, height: slotCardHeight)
+                }
             }
         }
-        .frame(height: 70)
     }
 
     // MARK: - Board du joueur
@@ -332,9 +321,7 @@ struct CombatView: View {
                 }
             }
         }
-        // Décale légèrement la grille vers la gauche et vers le haut pour une meilleure visibilité
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .offset(x: -20, y: -20)
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Zones spéciales (Dieu / Sacrifice / Défausse)
