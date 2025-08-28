@@ -330,7 +330,9 @@ struct CombatView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .center)
+        // Décale légèrement la grille vers la gauche et vers le haut pour une meilleure visibilité
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .offset(x: -20, y: -20)
     }
 
     // MARK: - Zones spéciales (Dieu / Sacrifice / Défausse)
