@@ -52,6 +52,8 @@ struct CombatView: View {
     @State private var dragPosition: CGPoint = .zero
     @State private var hoveredSlot: Int? = nil
     @State private var slotFrames: [Int: CGRect] = [:]
+    @State private var sacrificeFrame: CGRect = .zero
+    @State private var hoveringSacrifice = false
 
     // Tailles réduites pour mieux voir l’ensemble du plateau
     private let slotCardWidth: CGFloat = 60
@@ -379,16 +381,28 @@ struct CombatView: View {
 
             VStack(spacing: 6) {
                 Text("Sacrifice").font(.caption).foregroundStyle(.secondary)
-                // visuel tourné à 90° si présent
-                if let inst = engine.current.sacrificeSlot {
-                    CardView(card: inst.base, faceUp: true, width: slotCardWidth) {
-                        selectedCard = inst.base
+                ZStack {
+                    if let inst = engine.current.sacrificeSlot {
+                        CardView(card: inst.base, faceUp: true, width: slotCardWidth) {
+                            selectedCard = inst.base
+                        }
+                        .rotationEffect(.degrees(90))
+                        .overlay(Text("+1 Sang").font(.caption2.bold()).padding(4).background(.black.opacity(0.6)).clipShape(Capsule()).foregroundStyle(.white), alignment: .bottom)
+                    } else {
+                        emptySlot(width: slotCardWidth, height: slotCardHeight)
                     }
-                    .rotationEffect(.degrees(90))
-                    .overlay(Text("+1 Sang").font(.caption2.bold()).padding(4).background(.black.opacity(0.6)).clipShape(Capsule()).foregroundStyle(.white), alignment: .bottom)
-                } else {
-                    emptySlot(width: slotCardWidth, height: slotCardHeight)
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.yellow, lineWidth: 3)
+                        .opacity(hoveringSacrifice ? 1 : 0)
                 }
+                .frame(width: slotCardWidth, height: slotCardHeight)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear
+                            .onAppear { sacrificeFrame = geo.frame(in: .named("combatArea")) }
+                            .onChange(of: geo.frame(in: .named("combatArea"))) { sacrificeFrame = $0 }
+                    }
+                )
             }
 
             VStack(spacing: 6) {
@@ -431,18 +445,29 @@ struct CombatView: View {
                                 if let slot = slotFrames.first(where: { $0.value.contains(value.location) })?.key {
                                     if hoveredSlot != slot {
                                         hoveredSlot = slot
+                                        hoveringSacrifice = false
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    }
+                                } else if sacrificeFrame.contains(value.location) {
+                                    if !hoveringSacrifice {
+                                        hoveringSacrifice = true
+                                        hoveredSlot = nil
                                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                     }
                                 } else {
                                     hoveredSlot = nil
+                                    hoveringSacrifice = false
                                 }
                             }
                             .onEnded { _ in
                                 if let slot = hoveredSlot {
                                     engine.playCommonToBoard(handIndex: idx, slot: slot)
+                                } else if hoveringSacrifice {
+                                    engine.sacrificeCommon(handIndex: idx)
                                 }
                                 draggingCardIndex = nil
                                 hoveredSlot = nil
+                                hoveringSacrifice = false
                             }
                     )
                     .overlay(alignment: .bottom) {
