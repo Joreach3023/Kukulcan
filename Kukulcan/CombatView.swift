@@ -272,7 +272,7 @@ struct CombatView: View {
             VStack(spacing: 6) {
                 if let inst = engine.opponent.sacrificeSlot {
                     CardView(card: inst.base, faceUp: true, width: slotCardWidth)
-                        .rotationEffect(.degrees(90))
+                        .rotationEffect(.degrees(180))
                 } else {
                     emptySlot(width: slotCardWidth, height: slotCardHeight)
                 }
@@ -373,7 +373,7 @@ struct CombatView: View {
                         CardView(card: inst.base, faceUp: true, width: slotCardWidth) {
                             selectedCard = inst.base
                         }
-                        .rotationEffect(.degrees(90))
+                        .rotationEffect(.degrees(180))
                         .overlay(Text("+1 Sang").font(.caption2.bold()).padding(4).background(.black.opacity(0.6)).clipShape(Capsule()).foregroundStyle(.white), alignment: .bottom)
                     } else {
                         emptySlot(width: slotCardWidth, height: slotCardHeight)
