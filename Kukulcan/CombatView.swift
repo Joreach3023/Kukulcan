@@ -104,11 +104,15 @@ struct CombatView: View {
             }
         }
         .onAppear {
+            NotificationCenter.default.post(name: .combatViewDidAppear, object: nil)
             // Démarrer la partie si pas déjà fait
             if engine.p1.hand.isEmpty && engine.p2.hand.isEmpty {
                 engine.start()
             }
             AudioManager.shared.play(.combat)
+        }
+        .onDisappear {
+            NotificationCenter.default.post(name: .combatViewDidDisappear, object: nil)
         }
         .onChange(of: engine.lastDrawnCard) { card in
             guard let card else { return }

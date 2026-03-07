@@ -39,11 +39,13 @@ struct PacksView: View {
                 }
                 .padding(.horizontal)
 
-                // Affichage de l'or et du coût
+                // Affichage du coût
                 HStack {
-                    Text("Or : \(collection.gold)")
                     Spacer()
                     Text("Coût : \(packCost)")
+                        .foregroundStyle(.white)
+                        .fontWeight(.semibold)
+                    Spacer()
                 }
                 .padding(.horizontal)
 
@@ -87,6 +89,8 @@ struct PacksView: View {
                 Spacer()
 
                 Text("Cartes possédées : \(collection.owned.count)")
+                    .foregroundStyle(.white)
+                    .fontWeight(.semibold)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                     .padding(.horizontal)
