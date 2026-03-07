@@ -15,10 +15,6 @@ struct RunState: Codable {
     var nodes: [MapNode]
     var currentNodeID: UUID?
 
-    var nextNodeIndex: Int {
-        (nodes.filter(\.isVisited).map(\.index).max() ?? -1) + 1
-    }
-
     var isFinished: Bool {
         status == .victory || status == .gameOver
     }

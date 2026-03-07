@@ -1,13 +1,16 @@
 import SwiftUI
+import UIKit
 
 struct RunMapView: View {
     @StateObject private var runManager = RunManager()
+
+    private let mapAspectRatio: CGFloat = 768.0 / 1365.0
 
     var body: some View {
         VStack(spacing: 16) {
             if let run = runManager.runState {
                 header(run: run)
-                mapList(run: run)
+                mapCanvas(run: run)
                 statusFooter(run: run)
             } else {
                 Spacer()
@@ -68,40 +71,129 @@ struct RunMapView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func mapList(run: RunState) -> some View {
+    private func mapCanvas(run: RunState) -> some View {
         ScrollView {
-            VStack(spacing: 10) {
-                ForEach(run.nodes) { node in
-                    Button {
-                        runManager.selectNode(node)
-                    } label: {
-                        HStack {
-                            Image(systemName: node.type.systemImage)
-                                .foregroundStyle(node.type == .boss ? .red : .orange)
-                            Text("Nœud \(node.index + 1): \(node.type.title)")
-                            Spacer()
-                            if node.isVisited {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                            }
+            GeometryReader { proxy in
+                let width = proxy.size.width
+                let height = width / mapAspectRatio
+
+                ZStack {
+                    mapBackground
+                        .frame(width: width, height: height)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 18)
+                                .stroke(Color.orange.opacity(0.45), lineWidth: 1)
                         }
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    connectionsLayer(run: run, size: CGSize(width: width, height: height))
+
+                    ForEach(run.nodes) { node in
+                        nodeMarker(node: node, run: run, size: CGSize(width: width, height: height))
                     }
-                    .buttonStyle(.plain)
-                    .disabled(!runManager.isNodeSelectable(node) || run.isFinished)
-                    .opacity(runManager.isNodeSelectable(node) && !run.isFinished ? 1 : 0.45)
+                }
+            }
+            .frame(height: UIScreen.main.bounds.width / mapAspectRatio)
+        }
+    }
+
+    private var mapBackground: some View {
+        Group {
+            if UIImage(named: "roguelike_map_kukulcan") != nil {
+                Image("roguelike_map_kukulcan")
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image("bg_pyramid_close")
+                    .resizable()
+                    .scaledToFill()
+            }
+        }
+    }
+
+    private func connectionsLayer(run: RunState, size: CGSize) -> some View {
+        Canvas { context, _ in
+            for node in run.nodes {
+                for nextID in node.nextNodeIDs {
+                    guard let nextNode = run.nodes.first(where: { $0.id == nextID }) else { continue }
+
+                    var path = Path()
+                    let from = CGPoint(x: node.x * size.width, y: node.y * size.height)
+                    let to = CGPoint(x: nextNode.x * size.width, y: nextNode.y * size.height)
+                    path.move(to: from)
+                    path.addLine(to: to)
+
+                    let isVisiblePath = node.isCompleted || nextNode.isUnlocked
+                    context.stroke(
+                        path,
+                        with: .color(isVisiblePath ? Color.orange.opacity(0.75) : Color.black.opacity(0.25)),
+                        style: StrokeStyle(lineWidth: isVisiblePath ? 2.5 : 1.2, lineCap: .round, dash: isVisiblePath ? [] : [4, 6])
+                    )
                 }
             }
         }
+    }
+
+    private func nodeMarker(node: MapNode, run: RunState, size: CGSize) -> some View {
+        let isSelectable = runManager.isNodeSelectable(node)
+        let isLocked = !node.isUnlocked
+
+        return Button {
+            runManager.selectNode(node)
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(markerFillColor(node: node, isSelectable: isSelectable, isLocked: isLocked))
+                    .frame(width: 30, height: 30)
+                    .overlay {
+                        Circle()
+                            .stroke(markerStrokeColor(node: node, isSelectable: isSelectable), lineWidth: 1.5)
+                    }
+
+                Image(systemName: node.type.systemImage)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(node.isCompleted ? .green : .white)
+
+                if node.isCompleted {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.green)
+                        .offset(x: 14, y: -14)
+                }
+            }
+            .shadow(color: isSelectable ? .orange.opacity(0.5) : .black.opacity(0.2), radius: isSelectable ? 8 : 3)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isSelectable || run.isFinished)
+        .position(x: node.x * size.width, y: node.y * size.height)
+        .accessibilityLabel("\(node.type.title)")
+    }
+
+    private func markerFillColor(node: MapNode, isSelectable: Bool, isLocked: Bool) -> Color {
+        if node.isCompleted {
+            return Color.green.opacity(0.25)
+        }
+        if isLocked {
+            return Color.black.opacity(0.35)
+        }
+        return isSelectable ? Color.orange.opacity(0.32) : Color.white.opacity(0.2)
+    }
+
+    private func markerStrokeColor(node: MapNode, isSelectable: Bool) -> Color {
+        if node.isCompleted {
+            return .green
+        }
+        if node.type == .boss {
+            return .red
+        }
+        return isSelectable ? .orange : .gray
     }
 
     private func statusFooter(run: RunState) -> some View {
         Group {
             switch run.status {
             case .victory:
-                Text("🏆 Victoire ! Le boss final est vaincu.")
+                Text("🏆 Victoire ! Le temple du sommet est conquis.")
                     .font(.headline)
                     .foregroundStyle(.green)
             case .gameOver:
@@ -112,7 +204,7 @@ struct RunMapView: View {
                 Text("Récompense en cours...")
                     .foregroundStyle(.secondary)
             default:
-                Text("Sélectionnez le prochain nœud.")
+                Text("Cliquez sur un lieu lumineux pour avancer vers le temple du haut.")
                     .foregroundStyle(.secondary)
             }
         }

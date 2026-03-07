@@ -1,28 +1,32 @@
 import Foundation
+import CoreGraphics
 
-enum MapNodeType: String, Codable, CaseIterable {
+enum NodeType: String, Codable, CaseIterable {
     case combat
-    case campfire
+    case elite
     case shop
+    case campfire
     case event
     case boss
 
     var title: String {
         switch self {
         case .combat: return "Combat"
-        case .campfire: return "Campfire"
+        case .elite: return "Élite"
         case .shop: return "Shop"
-        case .event: return "Event"
+        case .campfire: return "Campfire"
+        case .event: return "Événement"
         case .boss: return "Boss"
         }
     }
 
     var systemImage: String {
         switch self {
-        case .combat: return "flame.fill"
-        case .campfire: return "cross.case.fill"
+        case .combat: return "sword.fill"
+        case .elite: return "skull.fill"
         case .shop: return "bag.fill"
-        case .event: return "sparkles"
+        case .campfire: return "flame.fill"
+        case .event: return "questionmark.circle.fill"
         case .boss: return "crown.fill"
         }
     }
@@ -30,14 +34,10 @@ enum MapNodeType: String, Codable, CaseIterable {
 
 struct MapNode: Identifiable, Codable, Hashable {
     let id: UUID
-    let index: Int
-    let type: MapNodeType
-    var isVisited: Bool
-
-    init(id: UUID = UUID(), index: Int, type: MapNodeType, isVisited: Bool = false) {
-        self.id = id
-        self.index = index
-        self.type = type
-        self.isVisited = isVisited
-    }
+    let type: NodeType
+    let x: CGFloat
+    let y: CGFloat
+    let nextNodeIDs: [UUID]
+    var isUnlocked: Bool
+    var isCompleted: Bool
 }
