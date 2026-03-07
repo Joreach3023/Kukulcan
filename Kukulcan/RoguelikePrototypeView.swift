@@ -7,6 +7,13 @@ struct RoguelikePrototypeView: View {
         "Stocker de l'or pour la boutique suivante"
     ]
 
+    @State private var playerHP = 24
+    @State private var gold = 0
+    @State private var deckPower = 6
+    @State private var floor = 1
+    @State private var currentPhase: RunPhase = .combat
+    @State private var log: [String] = ["Une nouvelle run commence. Préparez votre deck !"]
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -14,6 +21,7 @@ struct RoguelikePrototypeView: View {
                 conceptSection
                 cardsSection
                 loopSection
+                gameplaySection
                 shopSection
                 bossSection
                 roguelikeSection
@@ -89,6 +97,46 @@ struct RoguelikePrototypeView: View {
         }
     }
 
+    private var gameplaySection: some View {
+        GroupBox("🕹️ Gameplay jouable (prototype)") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Étage \(floor) • Phase : \(currentPhase.title)")
+                    .font(.headline)
+
+                HStack(spacing: 16) {
+                    Label("\(playerHP) HP", systemImage: "heart.fill")
+                    Label("\(gold) or", systemImage: "bitcoinsign.circle.fill")
+                    Label("Puissance \(deckPower)", systemImage: "flame.fill")
+                }
+                .font(.subheadline)
+
+                HStack(spacing: 10) {
+                    Button("Jouer la phase") {
+                        playCurrentPhase()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+
+                    Button("Nouvelle run") {
+                        resetRun()
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Journal de run")
+                        .font(.subheadline.bold())
+                    ForEach(Array(log.suffix(5).reversed().enumerated()), id: \.offset) { _, entry in
+                        Text("• \(entry)")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     private var bossSection: some View {
         GroupBox("👑 Boss & progression permanente") {
             VStack(alignment: .leading, spacing: 6) {
@@ -135,6 +183,74 @@ struct RoguelikePrototypeView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+}
+
+private extension RoguelikePrototypeView {
+    enum RunPhase {
+        case combat
+        case shop
+        case boss
+
+        var title: String {
+            switch self {
+            case .combat: return "Combat"
+            case .shop: return "Boutique"
+            case .boss: return "Boss"
+            }
+        }
+    }
+
+    func enemyPower() -> Int {
+        floor + (currentPhase == .boss ? 5 : 2)
+    }
+
+    func playCurrentPhase() {
+        switch currentPhase {
+        case .combat:
+            let reward = 6 + floor
+            let damage = max(0, enemyPower() - deckPower / 2)
+            playerHP = max(0, playerHP - damage)
+            gold += reward
+            log.append("Combat gagné : +\(reward) or, -\(damage) HP.")
+            currentPhase = floor.isMultiple(of: 3) ? .boss : .shop
+
+        case .shop:
+            let cost = 8
+            if gold >= cost {
+                gold -= cost
+                deckPower += 2
+                log.append("Boutique : amélioration achetée (+2 puissance).")
+            } else {
+                deckPower += 1
+                log.append("Boutique : pas assez d'or, entraînement léger (+1 puissance).")
+            }
+            floor += 1
+            currentPhase = .combat
+
+        case .boss:
+            let reward = 15
+            let damage = max(1, enemyPower() - deckPower / 2)
+            playerHP = max(0, playerHP - damage)
+            if playerHP > 0 {
+                gold += reward
+                deckPower += 1
+                floor += 1
+                log.append("Boss vaincu : +\(reward) or, relique obtenue (+1 puissance).")
+                currentPhase = .combat
+            } else {
+                log.append("Défaite contre le boss. Relancez une nouvelle run.")
+            }
+        }
+    }
+
+    func resetRun() {
+        playerHP = 24
+        gold = 0
+        deckPower = 6
+        floor = 1
+        currentPhase = .combat
+        log = ["Une nouvelle run commence. Préparez votre deck !"]
     }
 }
 
