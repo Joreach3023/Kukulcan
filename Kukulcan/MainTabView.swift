@@ -13,7 +13,7 @@ struct MainTabView: View {
                     .tabItem { Label("Collection", systemImage: "square.grid.2x2.fill") }
 
                 NavigationStack {
-                    RoguelikePrototypeView()
+                    RunMapView()
                 }
                 .tabItem { Label("Roguelike", systemImage: "map.fill") }
 
