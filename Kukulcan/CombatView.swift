@@ -43,9 +43,15 @@ struct CombatView: View {
 
     @State private var selectedCard: Card? = nil
 
-    @Namespace private var drawNamespace
-    @State private var animatingCard: Card? = nil
     @State private var showBloodRiver = false
+
+    @State private var deckFrame: CGRect = .zero
+    @State private var handCardFrames: [UUID: CGRect] = [:]
+    @State private var pendingDrawCards: [Card] = []
+    @State private var currentDrawFlight: DrawFlight? = nil
+    @State private var drawProgress: CGFloat = 0
+    @State private var hiddenHandCardIDs: Set<UUID> = []
+    @State private var hasAnimatedOpeningHand = false
 
     // Drag & drop depuis la main vers le board
     @State private var draggingCardIndex: Int? = nil
@@ -101,6 +107,12 @@ struct CombatView: View {
                         .shadow(radius: 8)
                         .zIndex(1)
                 }
+
+                if let flight = currentDrawFlight {
+                    DrawFlyingCardView(card: flight.card, progress: drawProgress, start: flight.start, end: flight.end, width: handCardWidth)
+                        .zIndex(2)
+                        .allowsHitTesting(false)
+                }
             }
         }
         .onAppear {
@@ -109,18 +121,15 @@ struct CombatView: View {
             if engine.p1.hand.isEmpty && engine.p2.hand.isEmpty {
                 engine.start()
             }
+            queueOpeningHandAnimationIfNeeded()
             AudioManager.shared.play(.combat)
         }
         .onDisappear {
             NotificationCenter.default.post(name: .combatViewDidDisappear, object: nil)
         }
-        .onChange(of: engine.lastDrawnCard) { card in
-            guard let card else { return }
-            animatingCard = card
-            withAnimation(.easeInOut(duration: 0.6)) { }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                animatingCard = nil
-            }
+        .onChange(of: engine.lastDrawnCards) { cards in
+            guard engine.currentPlayerIsP1, !cards.isEmpty else { return }
+            enqueueDrawAnimation(cards)
         }
         .onChange(of: engine.current.sacrificeSlot?.id) { _ in
             guard engine.current.sacrificeSlot != nil else { return }
@@ -342,11 +351,14 @@ struct CombatView: View {
                             .font(.headline.bold())
                             .foregroundStyle(.white)
                     }
-                    if let animatingCard {
-                        CardBackView().frame(width: deckCardWidth, height: deckCardHeight)
-                            .matchedGeometryEffect(id: animatingCard.id, in: drawNamespace)
-                    }
                 }
+                .background(
+                    GeometryReader { geo in
+                        Color.clear
+                            .onAppear { deckFrame = geo.frame(in: .named("combatArea")) }
+                            .onChange(of: geo.frame(in: .named("combatArea"))) { deckFrame = $0 }
+                    }
+                )
             }
 
             VStack(spacing: 6) {
@@ -423,9 +435,13 @@ struct CombatView: View {
                     CardView(card: c, faceUp: true, width: handCardWidth) {
                         selectedCard = c
                     }
-                    .matchedGeometryEffect(id: c.id, in: drawNamespace)
                     .rotation3DEffect(.degrees(12), axis: (x: 1, y: 0, z: 0))
-                    .opacity((animatingCard?.id == c.id || draggingCardIndex == idx) ? 0 : 1)
+                    .opacity((hiddenHandCardIDs.contains(c.id) || draggingCardIndex == idx) ? 0 : 1)
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear.preference(key: HandCardFramePreferenceKey.self, value: [c.id: geo.frame(in: .named("combatArea"))])
+                        }
+                    )
                     .gesture(
                         DragGesture(minimumDistance: 0, coordinateSpace: .named("combatArea"))
                             .onChanged { value in
@@ -469,6 +485,10 @@ struct CombatView: View {
             }
             .padding(.horizontal, 4)
         }
+        .onPreferenceChange(HandCardFramePreferenceKey.self) { frames in
+            handCardFrames.merge(frames) { _, new in new }
+            processPendingDrawAnimations()
+        }
     }
 
     // Boutons d’actions sur une carte en main
@@ -500,6 +520,51 @@ struct CombatView: View {
                 } label: { labelChip("Invoquer", system: "bolt.heart.fill") }
                 .disabled(engine.current.blood < c.bloodCost || engine.current.godSlot != nil)
             }
+        }
+    }
+
+
+    private func queueOpeningHandAnimationIfNeeded() {
+        guard !hasAnimatedOpeningHand else { return }
+        hasAnimatedOpeningHand = true
+        let openingHand = engine.p1.hand
+        guard !openingHand.isEmpty else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            enqueueDrawAnimation(openingHand)
+        }
+    }
+
+    private func enqueueDrawAnimation(_ cards: [Card]) {
+        pendingDrawCards.append(contentsOf: cards)
+        processPendingDrawAnimations()
+    }
+
+    private func processPendingDrawAnimations() {
+        guard currentDrawFlight == nil, !pendingDrawCards.isEmpty else { return }
+        guard deckFrame != .zero else { return }
+
+        let card = pendingDrawCards.removeFirst()
+        guard let targetFrame = handCardFrames[card.id] else {
+            pendingDrawCards.insert(card, at: 0)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                processPendingDrawAnimations()
+            }
+            return
+        }
+
+        hiddenHandCardIDs.insert(card.id)
+        currentDrawFlight = DrawFlight(card: card, start: CGPoint(x: deckFrame.midX, y: deckFrame.midY), end: CGPoint(x: targetFrame.midX, y: targetFrame.midY))
+        drawProgress = 0
+
+        withAnimation(.timingCurve(0.22, 0.95, 0.18, 1, duration: 0.55)) {
+            drawProgress = 1
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+            hiddenHandCardIDs.remove(card.id)
+            currentDrawFlight = nil
+            drawProgress = 0
+            processPendingDrawAnimations()
         }
     }
 
@@ -662,3 +727,40 @@ private struct BloodRiverView: View {
 }
 
 
+private struct DrawFlight {
+    let card: Card
+    let start: CGPoint
+    let end: CGPoint
+}
+
+private struct DrawFlyingCardView: View {
+    let card: Card
+    let progress: CGFloat
+    let start: CGPoint
+    let end: CGPoint
+    let width: CGFloat
+
+    var body: some View {
+        CardView(card: card, faceUp: true, width: width)
+            .scaleEffect(0.82 + (0.18 * progress))
+            .rotationEffect(.degrees(Double((1 - progress) * -9)))
+            .opacity(0.2 + (0.8 * progress))
+            .position(position)
+            .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 8)
+    }
+
+    private var position: CGPoint {
+        let x = start.x + ((end.x - start.x) * progress)
+        let baseY = start.y + ((end.y - start.y) * progress)
+        let arcLift = sin(progress * .pi) * 36
+        return CGPoint(x: x, y: baseY - arcLift)
+    }
+}
+
+private struct HandCardFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [UUID: CGRect] = [:]
+
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}

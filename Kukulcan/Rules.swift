@@ -124,6 +124,7 @@ final class GameEngine: ObservableObject {
     @Published private(set) var currentPlayerIsP1: Bool = true
     @Published private(set) var log: [String] = []
     @Published var lastDrawnCard: Card? = nil
+    @Published var lastDrawnCards: [Card] = []
 
     var current: PlayerState { currentPlayerIsP1 ? p1 : p2 }
     var opponent: PlayerState { currentPlayerIsP1 ? p2 : p1 }
@@ -371,13 +372,14 @@ final class GameEngine: ObservableObject {
     }
 
     private func drawForCurrent(_ n: Int) {
+        let drawn: [Card]
         if currentPlayerIsP1 {
-            let d = p1.draw(n)
-            lastDrawnCard = d.last
+            drawn = p1.draw(n)
         } else {
-            let d = p2.draw(n)
-            lastDrawnCard = d.last
+            drawn = p2.draw(n)
         }
+        lastDrawnCard = drawn.last
+        lastDrawnCards = drawn
     }
 
     // MARK: - IA facile
@@ -529,4 +531,3 @@ struct StarterFactory {
         playerDeck()
     }
 }
-
