@@ -6,6 +6,17 @@ private enum CombatOutcome {
     case win, loss
 }
 
+private enum TurnPhase {
+    case playerTurn
+    case playerEnding
+    case enemyTurn
+    case enemyDrawing
+    case enemyPlaying
+    case enemyResolving
+    case enemyEnding
+    case playerDrawing
+}
+
 struct CombatView: View {
     // Fournis un engine depuis l’extérieur si tu veux (collection/IA), sinon starter par défaut
     @StateObject private var engine: GameEngine
@@ -53,6 +64,16 @@ struct CombatView: View {
     @State private var hiddenHandCardIDs: Set<UUID> = []
     @State private var hasAnimatedOpeningHand = false
 
+    @State private var turnPhase: TurnPhase = .playerTurn
+    @State private var turnBanner: String? = nil
+    @State private var enemyDeckFrame: CGRect = .zero
+    @State private var enemyHandFrame: CGRect = .zero
+    @State private var enemyDrawProgress: CGFloat = 0
+    @State private var isEnemyDrawAnimating = false
+    @State private var enemyActionCard: Card? = nil
+    @State private var enemyAttackPulse = false
+    @State private var enemyAttackLineVisible = false
+
     // Drag & drop depuis la main vers le board
     @State private var draggingCardIndex: Int? = nil
     @State private var dragPosition: CGPoint = .zero
@@ -68,6 +89,11 @@ struct CombatView: View {
     private let deckCardHeight: CGFloat = 56
     private let handCardWidth: CGFloat = 90
     private var handCardHeight: CGFloat { handCardWidth * 1.4 }
+    private let enemyTurnStepDelay: TimeInterval = 0.6
+
+    private var isPlayerInteractionEnabled: Bool {
+        turnPhase == .playerTurn && outcome == nil
+    }
 
     var body: some View {
         GeometryReader { _ in
@@ -113,6 +139,37 @@ struct CombatView: View {
                         .zIndex(2)
                         .allowsHitTesting(false)
                 }
+
+                if isEnemyDrawAnimating {
+                    EnemyDrawFlightView(progress: enemyDrawProgress, start: CGPoint(x: enemyDeckFrame.midX, y: enemyDeckFrame.midY), end: CGPoint(x: enemyHandFrame.midX, y: enemyHandFrame.midY), width: deckCardWidth)
+                        .zIndex(3)
+                        .allowsHitTesting(false)
+                }
+
+                if let enemyActionCard {
+                    enemyActionOverlay(enemyActionCard)
+                        .zIndex(4)
+                        .allowsHitTesting(false)
+                }
+
+                if enemyAttackLineVisible {
+                    EnemyAttackLineView(pulsing: enemyAttackPulse)
+                        .zIndex(4)
+                        .allowsHitTesting(false)
+                }
+
+                if let turnBanner {
+                    Text(turnBanner)
+                        .font(.title2.bold())
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(.black.opacity(0.75))
+                        .foregroundStyle(.white)
+                        .clipShape(Capsule())
+                        .transition(.opacity.combined(with: .scale))
+                        .zIndex(5)
+                        .allowsHitTesting(false)
+                }
             }
         }
         .onAppear {
@@ -155,14 +212,15 @@ struct CombatView: View {
             handStrip
                 .padding(.horizontal, 12)
                 .padding(.bottom, 16)
+                .allowsHitTesting(isPlayerInteractionEnabled)
+                .opacity(isPlayerInteractionEnabled ? 1 : 0.7)
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 Button("Fin du tour") {
-                    playEndTurnSound()
-                    engine.endTurn()
-                    engine.performAITurn(level: aiLevel)
+                    endPlayerTurnAndRunEnemySequence()
                 }
+                .disabled(!isPlayerInteractionEnabled)
                 Button("Fin de partie") {
                     dismiss()
                 }
@@ -275,6 +333,36 @@ struct CombatView: View {
                             .rotationEffect(.degrees(180))
                     }
                 }
+                .background(
+                    GeometryReader { geo in
+                        Color.clear
+                            .onAppear { enemyDeckFrame = geo.frame(in: .named("combatArea")) }
+                            .onChange(of: geo.frame(in: .named("combatArea"))) { enemyDeckFrame = $0 }
+                    }
+                )
+            }
+
+            VStack(spacing: 6) {
+                Text("Main IA")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(180))
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.white.opacity(0.16))
+                    .frame(width: deckCardWidth + 8, height: deckCardHeight + 8)
+                    .overlay(
+                        Text("\(engine.opponent.hand.count)")
+                            .font(.caption.bold())
+                            .foregroundStyle(.white)
+                            .rotationEffect(.degrees(180))
+                    )
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear
+                                .onAppear { enemyHandFrame = geo.frame(in: .named("combatArea")) }
+                                .onChange(of: geo.frame(in: .named("combatArea"))) { enemyHandFrame = $0 }
+                        }
+                    )
             }
 
             VStack(spacing: 6) {
@@ -316,6 +404,7 @@ struct CombatView: View {
                                     // Attaquer depuis ce slot
                                     if inst != nil {
                                         Button {
+                                            guard isPlayerInteractionEnabled else { return }
                                             attackFromSlot = i
                                             showAttackPicker = true
                                         } label: {
@@ -366,11 +455,12 @@ struct CombatView: View {
                 ZStack(alignment: .topTrailing) {
                     slotView(for: engine.current.godSlot?.base, hp: engine.current.godSlot?.currentHP)
                         .frame(width: slotCardWidth, height: slotCardHeight)
-                    if engine.current.godSlot != nil {
-                        Button {
-                            attackFromSlot = -1
-                            showAttackPicker = true
-                        } label: {
+                                    if engine.current.godSlot != nil {
+                                        Button {
+                                            guard isPlayerInteractionEnabled else { return }
+                                            attackFromSlot = -1
+                                            showAttackPicker = true
+                                        } label: {
                             Image(systemName: "target")
                                 .font(.caption2.bold())
                                 .padding(6)
@@ -445,6 +535,7 @@ struct CombatView: View {
                     .gesture(
                         DragGesture(minimumDistance: 0, coordinateSpace: .named("combatArea"))
                             .onChanged { value in
+                                guard isPlayerInteractionEnabled else { return }
                                 dragPosition = value.location
                                 if draggingCardIndex == nil {
                                     draggingCardIndex = idx
@@ -467,6 +558,12 @@ struct CombatView: View {
                                 }
                             }
                             .onEnded { _ in
+                                guard isPlayerInteractionEnabled else {
+                                    draggingCardIndex = nil
+                                    hoveredSlot = nil
+                                    hoveringSacrifice = false
+                                    return
+                                }
                                 if let slot = hoveredSlot {
                                     engine.playCommonToBoard(handIndex: idx, slot: slot)
                                 } else if hoveringSacrifice {
@@ -506,19 +603,23 @@ struct CombatView: View {
                 } label: {
                     labelChip("Jouer", system: "hand.tap.fill")
                 }
+                .disabled(!isPlayerInteractionEnabled)
 
             case .ritual:
                 Button {
+                    guard isPlayerInteractionEnabled else { return }
                     pendingRitualHandIndex = index
                     ritualTargetSlot = nil
                     showTargetPickerForRitual = true
                 } label: { labelChip("Rituel", system: "wand.and.stars") }
+                .disabled(!isPlayerInteractionEnabled)
 
             case .god:
                 Button {
+                    guard isPlayerInteractionEnabled else { return }
                     engine.invokeGod(handIndex: index)
                 } label: { labelChip("Invoquer", system: "bolt.heart.fill") }
-                .disabled(engine.current.blood < c.bloodCost || engine.current.godSlot != nil)
+                .disabled(!isPlayerInteractionEnabled || engine.current.blood < c.bloodCost || engine.current.godSlot != nil)
             }
         }
     }
@@ -566,6 +667,183 @@ struct CombatView: View {
             drawProgress = 0
             processPendingDrawAnimations()
         }
+    }
+
+    private func endPlayerTurnAndRunEnemySequence() {
+        guard isPlayerInteractionEnabled else { return }
+        playEndTurnSound()
+        turnPhase = .playerEnding
+        showTurnBanner("Enemy Turn")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + enemyTurnStepDelay) {
+            runEnemyTurnSequence()
+        }
+    }
+
+    private func runEnemyTurnSequence() {
+        guard outcome == nil else { return }
+
+        if engine.currentPlayerIsP1 {
+            engine.endTurn()
+        }
+
+        turnPhase = .enemyTurn
+
+        runEnemyDrawStep {
+            runEnemyPlayStep {
+                runEnemyResolveStep {
+                    runEnemyEndStep()
+                }
+            }
+        }
+    }
+
+    private func runEnemyDrawStep(completion: @escaping () -> Void) {
+        turnPhase = .enemyDrawing
+        let didDraw = !engine.current.deck.isEmpty
+        engine.drawForCurrent(1)
+
+        if didDraw {
+            animateEnemyDraw()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) {
+                completion()
+            }
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                completion()
+            }
+        }
+    }
+
+    private func runEnemyPlayStep(completion: @escaping () -> Void) {
+        turnPhase = .enemyPlaying
+        if let action = chooseEnemyAction() {
+            enemyActionCard = action.card
+            action.execute()
+            DispatchQueue.main.asyncAfter(deadline: .now() + enemyTurnStepDelay) {
+                completion()
+            }
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                completion()
+            }
+        }
+    }
+
+    private func runEnemyResolveStep(completion: @escaping () -> Void) {
+        turnPhase = .enemyResolving
+
+        let enemyHasAttacker = engine.current.board.contains { $0 != nil } || engine.current.godSlot != nil
+        if enemyHasAttacker {
+            enemyAttackLineVisible = true
+            withAnimation(.easeInOut(duration: 0.25).repeatCount(2, autoreverses: true)) {
+                enemyAttackPulse.toggle()
+            }
+        }
+
+        performEnemyAttacks()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + enemyTurnStepDelay) {
+            enemyAttackLineVisible = false
+            enemyAttackPulse = false
+            completion()
+        }
+    }
+
+    private func runEnemyEndStep() {
+        turnPhase = .enemyEnding
+        enemyActionCard = nil
+        engine.endTurn()
+        turnPhase = .playerDrawing
+        showTurnBanner("Player Turn")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + enemyTurnStepDelay) {
+            turnPhase = .playerTurn
+        }
+    }
+
+    private func showTurnBanner(_ text: String) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            turnBanner = text
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                turnBanner = nil
+            }
+        }
+    }
+
+    private func animateEnemyDraw() {
+        guard enemyDeckFrame != .zero, enemyHandFrame != .zero else { return }
+        isEnemyDrawAnimating = true
+        enemyDrawProgress = 0
+        withAnimation(.timingCurve(0.22, 0.95, 0.18, 1, duration: 0.55)) {
+            enemyDrawProgress = 1
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+            isEnemyDrawAnimating = false
+            enemyDrawProgress = 0
+        }
+    }
+
+    private func chooseEnemyAction() -> EnemyAction? {
+        if let slot = engine.current.board.firstIndex(where: { $0 == nil }),
+           let idx = engine.current.hand.firstIndex(where: { $0.type == .common }) {
+            let card = engine.current.hand[idx]
+            return EnemyAction(card: card) {
+                engine.playCommonToBoard(handIndex: idx, slot: slot)
+            }
+        }
+
+        if engine.current.godSlot == nil,
+           let gIdx = engine.current.hand.firstIndex(where: { $0.type == .god }) {
+            let card = engine.current.hand[gIdx]
+            if engine.current.blood >= card.bloodCost {
+                return EnemyAction(card: card) {
+                    engine.invokeGod(handIndex: gIdx)
+                }
+            }
+        }
+
+        if let idx = engine.current.hand.firstIndex(where: { $0.type == .ritual }) {
+            let card = engine.current.hand[idx]
+            let target = engine.current.board.firstIndex(where: { $0 != nil })
+            return EnemyAction(card: card) {
+                engine.playRitual(handIndex: idx, targetSlot: target)
+            }
+        }
+
+        return nil
+    }
+
+    private func performEnemyAttacks() {
+        for i in 0..<engine.current.board.count {
+            if engine.current.board[i] != nil {
+                let target: Target = engine.opponent.board[i] != nil ? .boardSlot(i) : .player
+                engine.attack(from: i, to: target)
+            }
+        }
+
+        if engine.current.godSlot != nil {
+            engine.attack(from: -1, to: .player)
+        }
+    }
+
+    private func enemyActionOverlay(_ card: Card) -> some View {
+        VStack(spacing: 8) {
+            Text("Enemy plays")
+                .font(.caption.bold())
+                .foregroundStyle(.white.opacity(0.9))
+            CardView(card: card, faceUp: true, width: handCardWidth * 0.8)
+                .rotationEffect(.degrees(180))
+                .shadow(radius: 10)
+        }
+        .padding(10)
+        .background(.black.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.top, 84)
     }
 
     // MARK: - Helpers visuels
@@ -733,6 +1011,11 @@ private struct DrawFlight {
     let end: CGPoint
 }
 
+private struct EnemyAction {
+    let card: Card
+    let execute: () -> Void
+}
+
 private struct DrawFlyingCardView: View {
     let card: Card
     let progress: CGFloat
@@ -754,6 +1037,51 @@ private struct DrawFlyingCardView: View {
         let baseY = start.y + ((end.y - start.y) * progress)
         let arcLift = sin(progress * .pi) * 36
         return CGPoint(x: x, y: baseY - arcLift)
+    }
+}
+
+private struct EnemyDrawFlightView: View {
+    let progress: CGFloat
+    let start: CGPoint
+    let end: CGPoint
+    let width: CGFloat
+
+    var body: some View {
+        CardBackView(width: width)
+            .rotationEffect(.degrees(180))
+            .scaleEffect(0.82 + (0.18 * progress))
+            .rotationEffect(.degrees(Double((1 - progress) * -9)))
+            .opacity(0.2 + (0.8 * progress))
+            .position(position)
+            .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 8)
+    }
+
+    private var position: CGPoint {
+        let x = start.x + ((end.x - start.x) * progress)
+        let baseY = start.y + ((end.y - start.y) * progress)
+        let arcLift = sin(progress * .pi) * 28
+        return CGPoint(x: x, y: baseY - arcLift)
+    }
+}
+
+private struct EnemyAttackLineView: View {
+    let pulsing: Bool
+
+    var body: some View {
+        VStack {
+            Spacer(minLength: 120)
+            Rectangle()
+                .fill(Color.red.opacity(0.75))
+                .frame(height: 3)
+                .overlay(
+                    Rectangle()
+                        .fill(Color.red.opacity(0.35))
+                        .blur(radius: 6)
+                )
+                .padding(.horizontal, 30)
+                .scaleEffect(x: pulsing ? 1.06 : 0.94, y: 1, anchor: .center)
+            Spacer()
+        }
     }
 }
 
