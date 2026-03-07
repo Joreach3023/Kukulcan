@@ -12,6 +12,11 @@ struct MainTabView: View {
                 CollectionView()
                     .tabItem { Label("Collection", systemImage: "square.grid.2x2.fill") }
 
+                NavigationStack {
+                    RoguelikePrototypeView()
+                }
+                .tabItem { Label("Roguelike", systemImage: "map.fill") }
+
                 if collection.decks.contains(where: { $0.cards.count == 10 }) {
                     DeckSelectionView()
                         .tabItem { Label("Combats", systemImage: "gamecontroller.fill") }
@@ -44,4 +49,3 @@ struct MainTabView: View {
         }
     }
 }
-
