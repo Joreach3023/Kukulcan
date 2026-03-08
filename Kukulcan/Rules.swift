@@ -331,7 +331,9 @@ final class GameEngine: ObservableObject {
                 else { atkOwner.discard.append(atker.base); atkOwner.board[slot] = nil }
             } else {
                 assignBackAttacker()
-                defOwner.godSlot = def
+                if def.currentHP > 0 {
+                    defOwner.godSlot = def
+                }
             }
 
         case .boardSlot(let i):
