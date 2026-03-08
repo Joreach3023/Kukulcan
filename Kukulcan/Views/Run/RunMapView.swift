@@ -89,14 +89,11 @@ struct RunMapView: View {
             ShopChoiceSheet(
                 interaction: interaction,
                 player: runManager.runState?.player,
-                onBuyCard: { card in
-                    runManager.buyCard(card, from: interaction)
+                onBuyRelic: { offerID in
+                    runManager.buyRelic(offerID: offerID, from: interaction)
                 },
-                onBuyRelic: {
-                    runManager.buyRelic(from: interaction)
-                },
-                onRemoveCard: { cardID in
-                    runManager.removeCardFromDeck(cardID, in: interaction)
+                onLeave: {
+                    runManager.leaveShop(interaction)
                 }
             )
         }
@@ -436,64 +433,200 @@ private struct CampfireChoiceSheet: View {
 private struct ShopChoiceSheet: View {
     let interaction: ShopInteraction
     let player: PlayerRunState?
-    let onBuyCard: (Card) -> Void
-    let onBuyRelic: () -> Void
-    let onRemoveCard: (UUID) -> Void
+    let onBuyRelic: (UUID) -> Void
+    let onLeave: () -> Void
+
+    @State private var hasEntered = false
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Marchand Maya")
-                    .font(.title2.bold())
-                Text("Choisissez un seul achat pour ce shop.")
-                    .foregroundStyle(.secondary)
-                Text("Or disponible: \(player?.gold ?? 0)")
-                    .font(.headline)
-
-                Text("Acheter une carte (\(interaction.cardCost) or)")
-                    .font(.headline)
-                ForEach(interaction.cardOffers, id: \.id) { card in
-                    Button("\(card.name) • \(card.effect)") {
-                        onBuyCard(card)
+        GeometryReader { geo in
+            let size = geo.size
+            ZStack {
+                Image("assets/shop/shop_background")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size.width, height: size.height)
+                    .overlay {
+                        LinearGradient(
+                            colors: [.black.opacity(0.35), .black.opacity(0.15), .black.opacity(0.65)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     }
-                    .buttonStyle(.bordered)
-                    .disabled((player?.gold ?? 0) < interaction.cardCost)
+                    .clipped()
+
+                HStack {
+                    SpriteSheetAnimationView(imageName: "assets/shop/torch_fire_sprite", frameCount: 4, fps: 9)
+                        .frame(width: size.width * 0.2, height: size.height * 0.22)
+                    Spacer()
+                    SpriteSheetAnimationView(imageName: "assets/shop/torch_fire_sprite", frameCount: 4, fps: 9)
+                        .frame(width: size.width * 0.2, height: size.height * 0.22)
+                        .scaleEffect(x: -1, y: 1)
                 }
+                .padding(.horizontal, 8)
+                .offset(y: -size.height * 0.22)
 
-                Divider()
+                SpriteSheetAnimationView(imageName: "assets/shop/shop_incense_smoke", frameCount: 3, fps: 4)
+                    .frame(width: size.width * 0.6, height: size.height * 0.26)
+                    .opacity(0.35)
+                    .offset(y: -size.height * 0.16)
 
-                Button {
-                    onBuyRelic()
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Acheter relique: \(interaction.relic.name) (\(interaction.relicCost) or)")
-                            .font(.headline)
-                        Text(interaction.relic.effect)
-                            .font(.subheadline)
-                        Text("Rareté: \(interaction.relic.rarity.title)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image("assets/shop/merchant_maya")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size.width * 0.66)
+                    .offset(y: -size.height * 0.08)
+
+                VStack(spacing: 16) {
+                    header
+                    Spacer()
+                    relicOffers(size: size)
+                    controls
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled((player?.gold ?? 0) < interaction.relicCost)
+                .padding(.horizontal, 14)
+                .padding(.top, 18)
+                .padding(.bottom, max(12, geo.safeAreaInsets.bottom + 8))
+            }
+            .scaleEffect(hasEntered ? 1 : 1.04)
+            .opacity(hasEntered ? 1 : 0)
+            .animation(.easeOut(duration: 0.45), value: hasEntered)
+            .ignoresSafeArea()
+        }
+        .onAppear {
+            withAnimation { hasEntered = true }
+            AudioManager.shared.transitionToMusic(named: AudioManager.Track.collection.rawValue, fadeOutDuration: 0.4, fadeInDuration: 0.6)
+        }
+        .onDisappear {
+            AudioManager.shared.transitionToMusic(named: AudioManager.Track.home.rawValue, fadeOutDuration: 0.35, fadeInDuration: 0.45)
+        }
+    }
 
-                Divider()
+    private var header: some View {
+        HStack {
+            statPill(icon: "heart.fill", value: "\(player?.currentHP ?? 0)", tint: .red)
+            statPill(icon: "bitcoinsign.circle.fill", value: "\(player?.gold ?? 0)", tint: .yellow)
+            Spacer()
+            Button("Quitter") { onLeave() }
+                .buttonStyle(.bordered)
+                .tint(.white)
+        }
+    }
 
-                Text("Supprimer une carte (\(interaction.removeCardCost) or)")
-                    .font(.headline)
-                if let deck = player?.deck, !deck.isEmpty {
-                    List(deck) { instance in
-                        Button("Retirer \(instance.card.name)") {
-                            onRemoveCard(instance.id)
-                        }
-                        .disabled((player?.gold ?? 0) < interaction.removeCardCost)
-                    }
-                    .listStyle(.plain)
+    private func relicOffers(size: CGSize) -> some View {
+        let offers = interaction.relicOffers
+        return ZStack(alignment: .bottom) {
+            Image("assets/shop/shop_pedestal_slots")
+                .resizable()
+                .scaledToFit()
+                .frame(width: min(size.width * 0.95, 520))
+                .shadow(color: .black.opacity(0.6), radius: 18, y: 10)
+
+            HStack(spacing: 8) {
+                ForEach(offers) { offer in
+                    relicCard(offer)
+                        .frame(maxWidth: .infinity)
                 }
             }
-            .padding()
+            .padding(.horizontal, 14)
+            .padding(.bottom, 14)
+        }
+    }
+
+    private func relicCard(_ offer: ShopRelicOffer) -> some View {
+        let playerGold = player?.gold ?? 0
+        let affordable = playerGold >= offer.cost
+        let disabled = !affordable || offer.isPurchased
+
+        return VStack(spacing: 6) {
+            ZStack {
+                SpriteSheetAnimationView(imageName: "assets/shop/relic_glow_animation", frameCount: 2, fps: 2)
+                    .frame(width: 70, height: 70)
+                    .opacity(offer.isPurchased ? 0 : 0.7)
+
+                Circle()
+                    .fill(.black.opacity(0.55))
+                    .frame(width: 58, height: 58)
+
+                Text(String(offer.relic.name.prefix(1)))
+                    .font(.title2.bold())
+                    .foregroundStyle(.white)
+            }
+
+            Text(offer.relic.name)
+                .font(.caption.bold())
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white)
+
+            Text("\(offer.cost) or")
+                .font(.caption2.bold())
+                .foregroundStyle(affordable ? .yellow : .red)
+
+            Text(offer.relic.description)
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.85))
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+
+            Button(offer.isPurchased ? "Achetée" : "Acheter") {
+                onBuyRelic(offer.id)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(offer.isPurchased ? .gray : .orange)
+            .disabled(disabled)
+            .font(.caption.bold())
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.black.opacity(0.44))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(.white.opacity(0.15), lineWidth: 1))
+        )
+        .opacity(offer.isPurchased ? 0.62 : 1)
+    }
+
+    private var controls: some View {
+        Text("Choisissez vos reliques. Les offres déjà achetées restent visibles mais indisponibles.")
+            .font(.caption)
+            .foregroundStyle(.white.opacity(0.9))
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func statPill(icon: String, value: String, tint: Color) -> some View {
+        Label(value, systemImage: icon)
+            .font(.caption.bold())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.black.opacity(0.5), in: Capsule())
+            .overlay(Capsule().stroke(tint.opacity(0.8), lineWidth: 1))
+    }
+}
+
+private struct SpriteSheetAnimationView: View {
+    let imageName: String
+    let frameCount: Int
+    let fps: Double
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / max(fps, 1), paused: false)) { context in
+            let time = context.date.timeIntervalSinceReferenceDate
+            let frame = Int(time * max(fps, 1)) % max(frameCount, 1)
+
+            GeometryReader { geo in
+                let frameWidth = geo.size.width
+                let totalWidth = frameWidth * CGFloat(max(frameCount, 1))
+
+                Image(imageName)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: totalWidth, height: geo.size.height, alignment: .leading)
+                    .offset(x: -CGFloat(frame) * frameWidth)
+                    .clipped()
+            }
         }
     }
 }

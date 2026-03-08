@@ -12,14 +12,17 @@ struct CampfireInteraction: Identifiable {
     let healAmount: Int
 }
 
+struct ShopRelicOffer: Identifiable, Hashable {
+    let id = UUID()
+    let relic: Relic
+    let cost: Int
+    var isPurchased: Bool = false
+}
+
 struct ShopInteraction: Identifiable {
     let id = UUID()
     let nodeID: UUID
-    let cardOffers: [Card]
-    let cardCost: Int
-    let relic: Relic
-    let relicCost: Int
-    let removeCardCost: Int
+    var relicOffers: [ShopRelicOffer]
 }
 
 struct EventInteraction: Identifiable {
@@ -82,14 +85,9 @@ final class RunManager: ObservableObject {
             let healAmount = max(1, Int(Double(state.player.maxHP) * 0.3))
             pendingCampfire = CampfireInteraction(nodeID: node.id, healAmount: healAmount)
         case .shop:
-            let cardCostModifier = hasRelic(.obsidianOffering, in: state.player) ? 15 : 0
             pendingShop = ShopInteraction(
                 nodeID: node.id,
-                cardOffers: randomShopCards(),
-                cardCost: max(0, 65 - cardCostModifier),
-                relic: randomRelic(),
-                relicCost: 110,
-                removeCardCost: 55
+                relicOffers: randomShopRelics(count: 3)
             )
         case .event:
             if let event = MayaEventCatalog.events.randomElement() {
@@ -124,33 +122,26 @@ final class RunManager: ObservableObject {
         pendingCampfire = nil
     }
 
-    func buyCard(_ card: Card, from interaction: ShopInteraction) {
-        guard var state = runState, state.player.gold >= interaction.cardCost else { return }
-
-        state.player.gold -= interaction.cardCost
-        state.player.deck.append(RunCardInstance(card: card))
-        completeNode(interaction.nodeID, in: &state)
-        runState = state
-        pendingShop = nil
-    }
-
-    func buyRelic(from interaction: ShopInteraction) {
-        guard var state = runState, state.player.gold >= interaction.relicCost else { return }
-
-        state.player.gold -= interaction.relicCost
-        grantRelic(interaction.relic, to: &state.player)
-        completeNode(interaction.nodeID, in: &state)
-        runState = state
-        pendingShop = nil
-    }
-
-    func removeCardFromDeck(_ cardID: UUID, in interaction: ShopInteraction) {
+    func buyRelic(offerID: UUID, from interaction: ShopInteraction) {
         guard var state = runState,
-              state.player.gold >= interaction.removeCardCost,
-              let index = state.player.deck.firstIndex(where: { $0.id == cardID }) else { return }
+              var pending = pendingShop,
+              pending.id == interaction.id,
+              let offerIndex = pending.relicOffers.firstIndex(where: { $0.id == offerID }),
+              !pending.relicOffers[offerIndex].isPurchased else { return }
 
-        state.player.gold -= interaction.removeCardCost
-        state.player.deck.remove(at: index)
+        let offer = pending.relicOffers[offerIndex]
+        guard state.player.gold >= offer.cost else { return }
+
+        state.player.gold -= offer.cost
+        grantRelic(offer.relic, to: &state.player)
+        runState = state
+
+        pending.relicOffers[offerIndex].isPurchased = true
+        pendingShop = pending
+    }
+
+    func leaveShop(_ interaction: ShopInteraction) {
+        guard var state = runState else { return }
         completeNode(interaction.nodeID, in: &state)
         runState = state
         pendingShop = nil
@@ -321,8 +312,20 @@ final class RunManager: ObservableObject {
         }
     }
 
-    private func randomShopCards() -> [Card] {
-        Array((CardsDB.commons + CardsDB.rituals + CardsDB.gods).shuffled().prefix(3))
+    private func randomShopRelics(count: Int) -> [ShopRelicOffer] {
+        let minCost = 75
+        return Array(MayaRelicPool.all.shuffled().prefix(count)).map {
+            ShopRelicOffer(relic: $0, cost: minCost + rarityCostBonus(for: $0.rarity))
+        }
+    }
+
+    private func rarityCostBonus(for rarity: Rarity) -> Int {
+        switch rarity {
+        case .common: 0
+        case .rare: 25
+        case .epic: 35
+        case .legendary: 45
+        }
     }
 
     private func randomRelic() -> Relic {
