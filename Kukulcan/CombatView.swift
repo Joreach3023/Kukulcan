@@ -126,10 +126,16 @@ struct CombatView: View {
         turnPhase == .playerTurn && outcome == nil
     }
 
+    private var canCurrentPlayerAttack: Bool {
+        let player = engine.current
+        return player.godSlot?.hasActedThisTurn == false
+            || player.board.contains { $0?.hasActedThisTurn == false }
+    }
+
     private var hasAvailablePlayerAction: Bool {
         let player = engine.current
 
-        let hasReadyAttacker = engine.canCurrentPlayerAttack && (
+        let hasReadyAttacker = canCurrentPlayerAttack && (
             player.board.contains { $0?.hasActedThisTurn == false }
             || player.godSlot?.hasActedThisTurn == false
         )
@@ -286,11 +292,11 @@ struct CombatView: View {
         .onDisappear {
             NotificationCenter.default.post(name: .combatViewDidDisappear, object: nil)
         }
-        .onChange(of: engine.lastDrawnCards) { cards in
+        .onChange(of: engine.lastDrawnCards) { _, cards in
             guard engine.currentPlayerIsP1, !cards.isEmpty else { return }
             enqueueDrawAnimation(cards)
         }
-        .onChange(of: engine.current.sacrificeSlot?.id) { _ in
+        .onChange(of: engine.current.sacrificeSlot?.id) {
             guard engine.current.sacrificeSlot != nil else { return }
             let generator = UIImpactFeedbackGenerator(style: .heavy)
             generator.impactOccurred()
@@ -299,7 +305,7 @@ struct CombatView: View {
                 showBloodRiver = false
             }
         }
-        .onChange(of: playerActionStateSignature) { _ in
+        .onChange(of: playerActionStateSignature) {
             maybeAutoEndPlayerTurn()
         }
         .sheet(isPresented: $showTargetPickerForRitual) {
@@ -339,13 +345,13 @@ struct CombatView: View {
         .fullScreenCover(item: $selectedCard) { card in
             CardDetailView(card: card) { selectedCard = nil }
         }
-        .onChange(of: engine.p1.hp) { hp in
+        .onChange(of: engine.p1.hp) { _, hp in
             if hp <= 0 && outcome == nil {
                 outcome = .loss
                 onLoss?()
             }
         }
-        .onChange(of: engine.p2.hp) { hp in
+        .onChange(of: engine.p2.hp) { _, hp in
             if hp <= 0 && outcome == nil {
                 outcome = .win
                 onWin?(aiLevel)
@@ -452,7 +458,7 @@ struct CombatView: View {
     private var opponentBoardArea: some View {
         VStack(spacing: 6) {
             HStack(spacing: 8) {
-                ForEach(0..<3) { i in
+                ForEach(engine.opponent.board.indices, id: \.self) { i in
                     let inst = engine.opponent.board[i]
                     slotView(for: inst?.base, hp: inst?.currentHP)
                 }
@@ -478,7 +484,7 @@ struct CombatView: View {
                     GeometryReader { geo in
                         Color.clear
                             .onAppear { enemyDeckFrame = geo.frame(in: .named("combatArea")) }
-                            .onChange(of: geo.frame(in: .named("combatArea"))) { enemyDeckFrame = $0 }
+                            .onChange(of: geo.frame(in: .named("combatArea"))) { _, frame in enemyDeckFrame = frame }
                     }
                 )
             }
@@ -501,7 +507,7 @@ struct CombatView: View {
                         GeometryReader { geo in
                             Color.clear
                                 .onAppear { enemyHandFrame = geo.frame(in: .named("combatArea")) }
-                                .onChange(of: geo.frame(in: .named("combatArea"))) { enemyHandFrame = $0 }
+                                .onChange(of: geo.frame(in: .named("combatArea"))) { _, frame in enemyHandFrame = frame }
                         }
                     )
             }
@@ -531,7 +537,7 @@ struct CombatView: View {
                 .minimumScaleFactor(0.75)
                 .foregroundStyle(.secondary)
             HStack(spacing: 8) {
-                ForEach(0..<3) { i in
+                ForEach(engine.current.board.indices, id: \.self) { i in
                     let inst = engine.current.board[i]
                     // Carte en jeu
                     ZStack(alignment: .topTrailing) {
@@ -541,7 +547,7 @@ struct CombatView: View {
                                     let frame = geo.frame(in: .named("combatArea"))
                                     Color.clear
                                         .onAppear { slotFrames[i] = frame }
-                                        .onChange(of: frame) { slotFrames[i] = $0 }
+                                        .onChange(of: frame) { _, newFrame in slotFrames[i] = newFrame }
                                 }
                             )
                             .overlay(
@@ -559,8 +565,8 @@ struct CombatView: View {
                                                 .background(Circle().fill(.orange))
                                                 .foregroundStyle(.white)
                                         }
-                                        .disabled(inst?.hasActedThisTurn != false || !engine.canCurrentPlayerAttack)
-                                        .opacity((inst?.hasActedThisTurn == true || !engine.canCurrentPlayerAttack) ? 0.45 : 1)
+                                        .disabled(inst?.hasActedThisTurn != false || !canCurrentPlayerAttack)
+                                        .opacity((inst?.hasActedThisTurn == true || !canCurrentPlayerAttack) ? 0.45 : 1)
                                     }
                                 }
                                 .padding(6)
@@ -599,7 +605,7 @@ struct CombatView: View {
                     GeometryReader { geo in
                         Color.clear
                             .onAppear { deckFrame = geo.frame(in: .named("combatArea")) }
-                            .onChange(of: geo.frame(in: .named("combatArea"))) { deckFrame = $0 }
+                            .onChange(of: geo.frame(in: .named("combatArea"))) { _, frame in deckFrame = frame }
                     }
                 )
             }
@@ -625,8 +631,8 @@ struct CombatView: View {
                                 .background(Circle().fill(.orange))
                                 .foregroundStyle(.white)
                         }
-                        .disabled(engine.current.godSlot?.hasActedThisTurn != false || !engine.canCurrentPlayerAttack)
-                        .opacity((engine.current.godSlot?.hasActedThisTurn == true || !engine.canCurrentPlayerAttack) ? 0.45 : 1)
+                        .disabled(engine.current.godSlot?.hasActedThisTurn != false || !canCurrentPlayerAttack)
+                        .opacity((engine.current.godSlot?.hasActedThisTurn == true || !canCurrentPlayerAttack) ? 0.45 : 1)
                         .padding(6)
                     }
                 }
@@ -657,7 +663,7 @@ struct CombatView: View {
                     GeometryReader { geo in
                         Color.clear
                             .onAppear { sacrificeFrame = geo.frame(in: .named("combatArea")) }
-                            .onChange(of: geo.frame(in: .named("combatArea"))) { sacrificeFrame = $0 }
+                            .onChange(of: geo.frame(in: .named("combatArea"))) { _, frame in sacrificeFrame = frame }
                     }
                 )
             }
@@ -1245,7 +1251,7 @@ struct CombatView: View {
 
 private extension CombatView {
     var laneAttackButtons: some View {
-        ForEach(0..<3) { i in
+        ForEach(engine.current.board.indices, id: \.self) { i in
             Button("Lane \(i + 1)") {
                 if let from = attackFromSlot {
                     engine.attack(from: from, to: .boardSlot(i))
