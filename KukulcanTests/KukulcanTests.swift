@@ -129,9 +129,9 @@ struct KukulcanTests {
         let suite = UserDefaults(suiteName: UUID().uuidString)!
         let store = CollectionStore(store: suite)
         store.earnGold(10)
-        #expect(store.gold == 10)
+        #expect(store.gold == 10_010)
         store.earnGold(-20)
-        #expect(store.gold == 10)
+        #expect(store.gold == 10_010)
     }
 
     /// Dépenser de l'or réduit la réserve mais ne va pas sous zéro.
@@ -140,10 +140,10 @@ struct KukulcanTests {
         let store = CollectionStore(store: suite)
         store.earnGold(10)
         store.spendGold(4)
-        #expect(store.gold == 6)
+        #expect(store.gold == 10_006)
         store.spendGold(-3)
-        #expect(store.gold == 6)
-        store.spendGold(10)
+        #expect(store.gold == 10_006)
+        store.spendGold(10_010)
         #expect(store.gold == 0)
     }
 
@@ -151,10 +151,10 @@ struct KukulcanTests {
     @Test func goldPersistsAcrossInstances() {
         let suiteName = UUID().uuidString
         let suite = UserDefaults(suiteName: suiteName)!
-        var store = CollectionStore(store: suite)
+        let store = CollectionStore(store: suite)
         store.earnGold(5)
         let reloaded = CollectionStore(store: UserDefaults(suiteName: suiteName)!)
-        #expect(reloaded.gold == 5)
+        #expect(reloaded.gold == 10_005)
     }
 
     /// Acheter un pack consomme l'or et ajoute des cartes à la collection.
@@ -165,12 +165,12 @@ struct KukulcanTests {
 
         let cards = store.buyPack(cost: 30)
         #expect(cards?.count == 3)
-        #expect(store.gold == 70)
+        #expect(store.gold == 10_070)
         #expect(store.owned.count == 3)
 
-        let failed = store.buyPack(cost: 100)
+        let failed = store.buyPack(cost: 10_100)
         #expect(failed == nil)
-        #expect(store.gold == 70)
+        #expect(store.gold == 10_070)
     }
 
     /// L'IA doit reconnaître un létal immédiat avec ses attaquants disponibles.
