@@ -190,9 +190,14 @@ struct RunMapView: View {
                             .stroke(markerStrokeColor(node: node, isSelectable: isSelectable), lineWidth: 1.5)
                     }
 
-                Image(systemName: node.type.systemImage)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(node.isCompleted ? .green : .white)
+                if node.type == .campfire {
+                    CampfireNodeView(size: 28)
+                        .opacity(node.isCompleted ? 0.7 : 1)
+                } else {
+                    Image(systemName: node.type.systemImage)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(node.isCompleted ? .green : .white)
+                }
 
                 if node.isCompleted {
                     Image(systemName: "checkmark.circle.fill")
