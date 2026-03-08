@@ -7,6 +7,15 @@ struct RunMapView: View {
     private let mapAspectRatio: CGFloat = 0.6
     private let mapColumns: CGFloat = 7
 
+    private enum MapTuning {
+        static let startNodeCount = 3
+        static let fogRowsAhead = 4
+        static let fogNearVeilOpacity = 0.08
+        static let fogFarVeilOpacity = 0.58
+        static let fogFarContentOpacity = 0.4
+        static let fogMaxBlur: CGFloat = 2.8
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             if let run = runManager.runState {
@@ -164,9 +173,11 @@ struct RunMapView: View {
                     path.addLine(to: to)
 
                     let isVisiblePath = node.isCompleted || nextNode.isUnlocked
+                    let fog = max(fogAmount(for: node.row, in: run), fogAmount(for: nextNode.row, in: run))
+                    let baseColor = isVisiblePath ? Color.orange.opacity(0.75) : Color.black.opacity(0.25)
                     context.stroke(
                         path,
-                        with: .color(isVisiblePath ? Color.orange.opacity(0.75) : Color.black.opacity(0.25)),
+                        with: .color(baseColor.opacity(1 - (fog * 0.65))),
                         style: StrokeStyle(lineWidth: isVisiblePath ? 2.5 : 1.2, lineCap: .round, dash: isVisiblePath ? [] : [4, 6])
                     )
                 }
@@ -177,6 +188,7 @@ struct RunMapView: View {
     private func nodeMarker(node: MapNode, run: RunState, size: CGSize) -> some View {
         let isSelectable = runManager.isNodeSelectable(node)
         let isLocked = !node.isUnlocked
+        let fog = fogAmount(for: node.row, in: run)
 
         return Button {
             runManager.selectNode(node)
@@ -199,13 +211,25 @@ struct RunMapView: View {
                         .foregroundStyle(node.isCompleted ? .green : .white)
                 }
 
+                if node.isDisabled {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.9))
+                }
+
                 if node.isCompleted {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 12))
                         .foregroundStyle(.green)
                         .offset(x: 14, y: -14)
                 }
+
+                Circle()
+                    .fill(Color.black.opacity(veilOpacity(for: fog)))
+                    .frame(width: 30, height: 30)
             }
+            .opacity(contentOpacity(for: fog))
+            .blur(radius: blurRadius(for: fog))
             .shadow(color: isSelectable ? .orange.opacity(0.5) : .black.opacity(0.2), radius: isSelectable ? 8 : 3)
         }
         .buttonStyle(.plain)
@@ -218,6 +242,9 @@ struct RunMapView: View {
         if node.isCompleted {
             return Color.green.opacity(0.25)
         }
+        if node.isDisabled {
+            return Color.gray.opacity(0.18)
+        }
         if isLocked {
             return Color.black.opacity(0.35)
         }
@@ -228,12 +255,47 @@ struct RunMapView: View {
         if node.isCompleted {
             return .green
         }
+        if node.isDisabled {
+            return .gray.opacity(0.7)
+        }
         if node.type == .boss {
             return .red
         }
         return isSelectable ? .orange : .gray
     }
 
+    private func currentExplorationRow(in run: RunState) -> Int {
+        if let currentNodeID = run.currentNodeID,
+           let node = run.nodes.first(where: { $0.id == currentNodeID }) {
+            return node.row
+        }
+
+        return run.nodes.filter(\.isCompleted).map(\.row).max() ?? 0
+    }
+
+    private func fogAmount(for row: Int, in run: RunState) -> Double {
+        let baseRow = currentExplorationRow(in: run)
+        let aheadDistance = row - baseRow
+
+        if aheadDistance <= 1 {
+            return 0
+        }
+
+        let normalized = min(1, Double(aheadDistance - 1) / Double(max(1, MapTuning.fogRowsAhead - 1)))
+        return normalized
+    }
+
+    private func veilOpacity(for fogAmount: Double) -> Double {
+        MapTuning.fogNearVeilOpacity + (MapTuning.fogFarVeilOpacity - MapTuning.fogNearVeilOpacity) * fogAmount
+    }
+
+    private func contentOpacity(for fogAmount: Double) -> Double {
+        1 - ((1 - MapTuning.fogFarContentOpacity) * fogAmount)
+    }
+
+    private func blurRadius(for fogAmount: Double) -> CGFloat {
+        CGFloat(fogAmount) * MapTuning.fogMaxBlur
+    }
 
     private func mapPoint(for node: MapNode, in size: CGSize) -> CGPoint {
         let rows = max(1, (runManager.runState?.nodes.map(\.row).max() ?? 1))
@@ -259,7 +321,7 @@ struct RunMapView: View {
                 Text("Récompense en cours...")
                     .foregroundStyle(.secondary)
             default:
-                Text("Cliquez sur un lieu lumineux pour avancer vers le temple du haut.")
+                Text("Choisissez 1 des \(MapTuning.startNodeCount) voies puis progressez vers le temple du haut.")
                     .foregroundStyle(.secondary)
             }
         }
