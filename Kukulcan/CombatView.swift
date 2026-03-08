@@ -230,6 +230,7 @@ struct CombatView: View {
                 .padding(.trailing, combatSceneTrailingPadding)
                 .padding(.top, 8)
                 .padding(.bottom, handCardHeight + max(20, geometry.safeAreaInsets.bottom + 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 if showBloodRiver {
                     BloodRiverView()
@@ -578,7 +579,7 @@ struct CombatView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 6)
         .padding(.vertical, 8)
         .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 14))
@@ -688,7 +689,7 @@ struct CombatView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 6)
         .padding(.vertical, 8)
         .background(.black.opacity(0.24), in: RoundedRectangle(cornerRadius: 14))
