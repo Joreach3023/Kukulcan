@@ -98,6 +98,25 @@ struct CombatView: View {
     private let handVerticalDragDominanceRatio: CGFloat = 1.15
     private let enemyTurnStepDelay: TimeInterval = 1.4
 
+    private var enemyAIConfiguration: EnemyAI.Configuration {
+        switch aiLevel {
+        case 1:
+            return .init(profile: .defensive, tuning: .defensive)
+        case 2:
+            return .init(profile: .balanced, tuning: .balanced)
+        case 3:
+            return .init(profile: .aggressive, tuning: .balanced)
+        case 4:
+            return .init(profile: .aggressive, tuning: .aggressive)
+        default:
+            return .init(profile: .balanced, tuning: .aggressive)
+        }
+    }
+
+    private var enemyAI: EnemyAI {
+        EnemyAI(configuration: enemyAIConfiguration)
+    }
+
     private var isPlayerInteractionEnabled: Bool {
         turnPhase == .playerTurn && outcome == nil
     }
@@ -880,7 +899,10 @@ struct CombatView: View {
         turnPhase = .enemyPlaying
         if let action = chooseEnemyAction() {
             enemyActionCard = action.card
-            action.execute()
+            let didExecute = action.execute(on: engine)
+            if !didExecute {
+                enemyActionCard = nil
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + enemyTurnStepDelay) {
                 completion()
             }
@@ -949,45 +971,13 @@ struct CombatView: View {
     }
 
     private func chooseEnemyAction() -> EnemyAction? {
-        if let slot = engine.current.board.firstIndex(where: { $0 == nil }),
-           let idx = engine.current.hand.firstIndex(where: { $0.type == .common }) {
-            let card = engine.current.hand[idx]
-            return EnemyAction(card: card) {
-                engine.playCommonToBoard(handIndex: idx, slot: slot)
-            }
-        }
-
-        if engine.current.godSlot == nil,
-           let gIdx = engine.current.hand.firstIndex(where: { $0.type == .god }) {
-            let card = engine.current.hand[gIdx]
-            if engine.current.blood >= card.bloodCost {
-                return EnemyAction(card: card) {
-                    engine.invokeGod(handIndex: gIdx)
-                }
-            }
-        }
-
-        if let idx = engine.current.hand.firstIndex(where: { $0.type == .ritual }) {
-            let card = engine.current.hand[idx]
-            let target = engine.current.board.firstIndex(where: { $0 != nil })
-            return EnemyAction(card: card) {
-                engine.playRitual(handIndex: idx, targetSlot: target)
-            }
-        }
-
-        return nil
+        enemyAI.chooseBestAction(engine: engine)
     }
 
     private func performEnemyAttacks() {
-        for i in 0..<engine.current.board.count {
-            if engine.current.board[i] != nil {
-                let target: Target = engine.opponent.board[i] != nil ? .boardSlot(i) : .player
-                engine.attack(from: i, to: target)
-            }
-        }
-
-        if engine.current.godSlot != nil {
-            engine.attack(from: -1, to: .player)
+        let plan = enemyAI.chooseAttackPlan(engine: engine)
+        for attack in plan {
+            engine.attack(from: attack.attackerSlot, to: attack.target)
         }
     }
 
@@ -1171,10 +1161,7 @@ private struct DrawFlight {
     let end: CGPoint
 }
 
-private struct EnemyAction {
-    let card: Card
-    let execute: () -> Void
-}
+private typealias EnemyAction = EnemyAI.PlannedAction
 
 private struct DrawFlyingCardView: View {
     let card: Card

@@ -172,4 +172,57 @@ struct KukulcanTests {
         #expect(failed == nil)
         #expect(store.gold == 70)
     }
+
+    /// L'IA doit reconnaître un létal immédiat avec ses attaquants disponibles.
+    @Test func enemyAIRecognizesLethal() {
+        var enemy = PlayerState(name: "Enemy")
+        var player = PlayerState(name: "Player")
+        player.hp = 4
+
+        let striker = Card(name: "Striker", type: .common, rarity: .common,
+                           imageName: "", attack: 2, health: 2, effect: "")
+        let god = Card(name: "God", type: .god, rarity: .legendary,
+                       imageName: "", attack: 2, health: 5, bloodCost: 3, effect: "")
+
+        enemy.board[0] = CardInstance(striker)
+        enemy.godSlot = CardInstance(god)
+
+        let ai = EnemyAI(configuration: .init(profile: .aggressive, tuning: .aggressive))
+        let state = EnemyAI.AIState(current: enemy, opponent: player)
+
+        #expect(ai.canDealLethal(state: state))
+    }
+
+    /// En vie basse, l'IA doit basculer vers une posture défensive.
+    @Test func enemyAISwitchesToDefenseOnLowHP() {
+        var enemy = PlayerState(name: "Enemy")
+        let player = PlayerState(name: "Player")
+        enemy.hp = 3
+
+        let ai = EnemyAI(configuration: .init(profile: .balanced, tuning: .balanced))
+        let state = EnemyAI.AIState(current: enemy, opponent: player)
+
+        #expect(ai.shouldDefend(state: state))
+    }
+
+    /// L'IA doit éviter un rituel sans cible valide et jouer une commune utile.
+    @Test func enemyAIAvoidsInvalidRitualWhenBetterPlayExists() {
+        var enemy = PlayerState(name: "Enemy")
+        let player = PlayerState(name: "Player")
+
+        let ritual = Card(name: "Couteau d'obsidienne", type: .ritual, rarity: .rare,
+                          imageName: "", ritual: .obsidianKnife, effect: "")
+        let common = Card(name: "Soldat", type: .common, rarity: .common,
+                          imageName: "", attack: 2, health: 2, effect: "")
+        enemy.hand = [ritual, common]
+
+        let engine = GameEngine(p1: player, p2: enemy)
+        engine.endTurn() // passe au tour de l'ennemi (p2)
+
+        let ai = EnemyAI(configuration: .init(profile: .balanced, tuning: .balanced))
+        let action = ai.chooseBestAction(engine: engine)
+
+        #expect(action?.card.id == common.id)
+    }
+
 }

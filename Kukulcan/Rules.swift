@@ -413,92 +413,43 @@ final class GameEngine: ObservableObject {
         lastDrawnCards = drawn
     }
 
-    // MARK: - IA facile
+    // MARK: - IA par priorités
     func performEasyAITurn() {
-        guard !currentPlayerIsP1 else { return }
-        if let slot = current.board.firstIndex(where: { $0 == nil }),
-           let idx = current.hand.firstIndex(where: { $0.type == .common }) {
-            playCommonToBoard(handIndex: idx, slot: slot)
-        }
-        for i in 0..<current.board.count {
-            if current.board[i] != nil {
-                attack(from: i, to: .boardSlot(i))
-            }
-        }
-        if current.godSlot != nil {
-            attack(from: -1, to: .player)
-        }
-        endTurn()
+        performPriorityAITurn(configuration: .init(profile: .defensive, tuning: .defensive))
     }
 
-    // MARK: - IA progressive
     func performAITurn(level: Int) {
+        let configuration: EnemyAI.Configuration
         switch level {
-        case 1: performEasyAITurn()
-        case 2: performMediumAITurn()
-        case 3: performHardAITurn()
-        case 4: performExpertAITurn()
-        default: performMasterAITurn()
+        case 1:
+            configuration = .init(profile: .defensive, tuning: .defensive)
+        case 2:
+            configuration = .init(profile: .balanced, tuning: .balanced)
+        case 3:
+            configuration = .init(profile: .aggressive, tuning: .balanced)
+        case 4:
+            configuration = .init(profile: .aggressive, tuning: .aggressive)
+        default:
+            configuration = .init(profile: .balanced, tuning: .aggressive)
         }
+        performPriorityAITurn(configuration: configuration)
     }
 
-    private func performMediumAITurn() {
+    private func performPriorityAITurn(configuration: EnemyAI.Configuration) {
         guard !currentPlayerIsP1 else { return }
-        // Pose autant de communes que possible
-        while let slot = current.board.firstIndex(where: { $0 == nil }),
-              let idx = current.hand.firstIndex(where: { $0.type == .common }) {
-            playCommonToBoard(handIndex: idx, slot: slot)
+
+        let ai = EnemyAI(configuration: configuration)
+
+        if let action = ai.chooseBestAction(engine: self) {
+            _ = action.execute(on: self)
         }
-        // Attaque les emplacements adverses ou le joueur s'ils sont libres
-        for i in 0..<current.board.count {
-            if current.board[i] != nil {
-                let target: Target = opponent.board[i] != nil ? .boardSlot(i) : .player
-                attack(from: i, to: target)
-            }
+
+        let attacks = ai.chooseAttackPlan(engine: self)
+        for attack in attacks {
+            self.attack(from: attack.attackerSlot, to: attack.target)
         }
-        if current.godSlot != nil {
-            attack(from: -1, to: .player)
-        }
+
         endTurn()
-    }
-
-    private func performHardAITurn() {
-        guard !currentPlayerIsP1 else { return }
-        // Tente d'invoquer un dieu, sinon sacrifie pour gagner du sang
-        if current.godSlot == nil, let gIdx = current.hand.firstIndex(where: { $0.type == .god }) {
-            let god = current.hand[gIdx]
-            if current.blood >= god.bloodCost {
-                invokeGod(handIndex: gIdx)
-            } else if let sac = current.hand.firstIndex(where: { $0.type == .common }) {
-                sacrificeCommon(handIndex: sac)
-            }
-        } else if current.blood < 3, let sac = current.hand.firstIndex(where: { $0.type == .common }) {
-            // Accumule du sang en prévision
-            sacrificeCommon(handIndex: sac)
-        }
-        performMediumAITurn()
-    }
-
-    private func performExpertAITurn() {
-        guard !currentPlayerIsP1 else { return }
-        // Utilise un rituel si disponible
-        if let rIdx = current.hand.firstIndex(where: { $0.type == .ritual }) {
-            if let slot = current.board.firstIndex(where: { $0 != nil }) {
-                playRitual(handIndex: rIdx, targetSlot: slot)
-            } else {
-                playRitual(handIndex: rIdx)
-            }
-        }
-        performHardAITurn()
-    }
-
-    private func performMasterAITurn() {
-        guard !currentPlayerIsP1 else { return }
-        // Sacrifie d'abord si possible pour préparer les gros tours
-        if let sac = current.hand.firstIndex(where: { $0.type == .common }) {
-            sacrificeCommon(handIndex: sac)
-        }
-        performExpertAITurn()
     }
 
     // MARK: - Réinitialisation
@@ -510,6 +461,308 @@ final class GameEngine: ObservableObject {
         start()
     }
 }
+
+struct EnemyAI {
+    enum Profile {
+        case aggressive
+        case defensive
+        case balanced
+    }
+
+    struct Tuning {
+        let aggressiveness: Double
+        let lowHealthThreshold: Int
+        let defensiveCardValue: Double
+        let lethalPriority: Double
+
+        static let defensive = Tuning(aggressiveness: 0.8, lowHealthThreshold: 5, defensiveCardValue: 2.1, lethalPriority: 14)
+        static let balanced = Tuning(aggressiveness: 1.0, lowHealthThreshold: 4, defensiveCardValue: 1.4, lethalPriority: 12)
+        static let aggressive = Tuning(aggressiveness: 1.35, lowHealthThreshold: 3, defensiveCardValue: 0.9, lethalPriority: 11)
+    }
+
+    struct Configuration {
+        let profile: Profile
+        let tuning: Tuning
+    }
+
+    struct PlannedAction {
+        let card: Card
+        private let executeImpl: (GameEngine) -> Bool
+
+        init(card: Card, execute: @escaping (GameEngine) -> Bool) {
+            self.card = card
+            self.executeImpl = execute
+        }
+
+        @discardableResult
+        func execute(on engine: GameEngine) -> Bool {
+            executeImpl(engine)
+        }
+    }
+
+    struct PlannedAttack {
+        let attackerSlot: Int
+        let target: Target
+    }
+
+    private let config: Configuration
+
+    init(configuration: Configuration) {
+        self.config = configuration
+    }
+
+    func chooseBestAction(engine: GameEngine) -> PlannedAction? {
+        let state = AIState(current: engine.current, opponent: engine.opponent)
+        let shouldPrioritizeDefense = shouldDefend(state: state)
+
+        let candidates = buildActionCandidates(from: state)
+        let ranked = candidates.map { candidate -> (candidate: ActionCandidate, score: Double) in
+            (candidate, evaluateCard(candidate: candidate, state: state, shouldPrioritizeDefense: shouldPrioritizeDefense))
+        }
+
+        guard let best = ranked.max(by: { $0.score < $1.score }), best.score > 0 else {
+            return nil
+        }
+
+        return plannedAction(for: best.candidate)
+    }
+
+    func chooseAttackPlan(engine: GameEngine) -> [PlannedAttack] {
+        let state = AIState(current: engine.current, opponent: engine.opponent)
+        let attackers = availableAttackers(from: state.current)
+
+        guard !attackers.isEmpty else { return [] }
+
+        if canDealLethal(state: state) {
+            return attackers.map { PlannedAttack(attackerSlot: $0, target: .player) }
+        }
+
+        return attackers.map { slot in
+            PlannedAttack(attackerSlot: slot, target: bestTarget(for: slot, state: state))
+        }
+    }
+
+    func canDealLethal(state: AIState) -> Bool {
+        let totalDamage = availableAttackers(from: state.current)
+            .compactMap { attackValue(for: $0, from: state.current) }
+            .reduce(0, +)
+        return totalDamage >= state.opponent.hp
+    }
+
+    func shouldDefend(state: AIState) -> Bool {
+        if state.current.hp <= config.tuning.lowHealthThreshold {
+            return true
+        }
+
+        let incomingThreat = boardThreat(of: state.opponent)
+        return incomingThreat >= max(2, state.current.hp / 2)
+    }
+
+    func evaluateCard(candidate: ActionCandidate, state: AIState, shouldPrioritizeDefense: Bool) -> Double {
+        let baseAggro = config.tuning.aggressiveness
+        let defenseMultiplier = shouldPrioritizeDefense ? config.tuning.defensiveCardValue : 1.0
+
+        switch candidate.kind {
+        case .playCommon(let emptySlot):
+            let card = candidate.card
+            let laneThreat = laneThreatScore(on: emptySlot, opponent: state.opponent)
+            let offensiveValue = Double(card.attack) * baseAggro
+            let defensiveValue = Double(card.health + laneThreat) * defenseMultiplier
+            return offensiveValue + defensiveValue
+
+        case .invokeGod:
+            let card = candidate.card
+            var score = 6.0 + Double(card.attack + card.health) * baseAggro
+            if card.name == "Kukulcan" {
+                score += Double(state.opponent.board.compactMap { $0 }.count) * 2.5
+            }
+            if state.opponent.hp <= card.attack {
+                score += config.tuning.lethalPriority
+            }
+            return score
+
+        case .playRitual(let target):
+            guard let ritual = candidate.card.ritual else { return -100 }
+            switch ritual {
+            case .obsidianKnife:
+                guard let slot = target else { return -50 }
+                guard let victim = state.current.board[slot] else { return -50 }
+                let resourceValue = 3.0
+                let sacrificePenalty = Double(victim.currentAttack + victim.currentHP) * 0.3
+                let canEnableGod = hasAffordableGodAfterKnife(state: state)
+                return resourceValue - sacrificePenalty + (canEnableGod ? 4.0 : 0)
+            case .bloodAltar:
+                let hasFollowUpSacrifice = state.current.hand.contains(where: { $0.type == .common })
+                return hasFollowUpSacrifice ? 3.4 : -2.0
+            case .forestCharm:
+                guard let slot = target, let unit = state.current.board[slot] else { return -5.0 }
+                let attackValue = Double(unit.currentAttack + 1) * baseAggro
+                let surviveValue = Double(unit.currentHP + 1) * defenseMultiplier
+                return attackValue + surviveValue
+            }
+
+        case .sacrificeCommon:
+            let hasGodInHand = state.current.hand.contains(where: { $0.type == .god })
+            return hasGodInHand ? 3.8 : 1.2
+        }
+    }
+}
+
+extension EnemyAI {
+    struct AIState {
+        let current: PlayerState
+        let opponent: PlayerState
+    }
+
+    enum ActionKind {
+        case playCommon(emptySlot: Int)
+        case invokeGod
+        case playRitual(target: Int?)
+        case sacrificeCommon
+    }
+
+    struct ActionCandidate {
+        let card: Card
+        let handIndex: Int
+        let kind: ActionKind
+    }
+
+    private func buildActionCandidates(from state: AIState) -> [ActionCandidate] {
+        var candidates: [ActionCandidate] = []
+        let emptySlots = state.current.board.indices.filter { state.current.board[$0] == nil }
+
+        for (idx, card) in state.current.hand.enumerated() {
+            switch card.type {
+            case .common:
+                for slot in emptySlots {
+                    candidates.append(ActionCandidate(card: card, handIndex: idx, kind: .playCommon(emptySlot: slot)))
+                }
+                candidates.append(ActionCandidate(card: card, handIndex: idx, kind: .sacrificeCommon))
+
+            case .god:
+                guard state.current.godSlot == nil, state.current.blood >= card.bloodCost else { continue }
+                candidates.append(ActionCandidate(card: card, handIndex: idx, kind: .invokeGod))
+
+            case .ritual:
+                guard let ritual = card.ritual else { continue }
+                switch ritual {
+                case .obsidianKnife, .forestCharm:
+                    for slot in state.current.board.indices where state.current.board[slot] != nil {
+                        candidates.append(ActionCandidate(card: card, handIndex: idx, kind: .playRitual(target: slot)))
+                    }
+                case .bloodAltar:
+                    candidates.append(ActionCandidate(card: card, handIndex: idx, kind: .playRitual(target: nil)))
+                }
+            }
+        }
+
+        return candidates
+    }
+
+    private func plannedAction(for candidate: ActionCandidate) -> PlannedAction {
+        PlannedAction(card: candidate.card) { engine in
+            guard let currentHandIndex = engine.current.hand.firstIndex(where: { $0.id == candidate.card.id }) else {
+                return false
+            }
+
+            switch candidate.kind {
+            case .playCommon(let slot):
+                guard slot >= 0, slot < engine.current.board.count, engine.current.board[slot] == nil else {
+                    return false
+                }
+                engine.playCommonToBoard(handIndex: currentHandIndex, slot: slot)
+                return true
+
+            case .invokeGod:
+                guard engine.current.godSlot == nil else { return false }
+                let card = engine.current.hand[currentHandIndex]
+                guard engine.current.blood >= card.bloodCost else { return false }
+                engine.invokeGod(handIndex: currentHandIndex)
+                return true
+
+            case .playRitual(let target):
+                if let target {
+                    guard target >= 0, target < engine.current.board.count, engine.current.board[target] != nil else { return false }
+                }
+                engine.playRitual(handIndex: currentHandIndex, targetSlot: target)
+                return true
+
+            case .sacrificeCommon:
+                engine.sacrificeCommon(handIndex: currentHandIndex)
+                return true
+            }
+        }
+    }
+
+    private func availableAttackers(from state: PlayerState) -> [Int] {
+        var attackers = state.board.indices.filter { idx in
+            guard let unit = state.board[idx] else { return false }
+            return !unit.hasActedThisTurn
+        }
+
+        if let god = state.godSlot, !god.hasActedThisTurn {
+            attackers.append(-1)
+        }
+
+        return attackers
+    }
+
+    private func bestTarget(for attackerSlot: Int, state: AIState) -> Target {
+        let attackerAttack = attackValue(for: attackerSlot, from: state.current) ?? 0
+        var bestTarget: Target = .player
+        var bestScore = Double(attackerAttack) * config.tuning.aggressiveness
+
+        for idx in state.opponent.board.indices {
+            guard let target = state.opponent.board[idx] else { continue }
+            let killBonus = attackerAttack >= target.currentHP ? 2.8 : 0.6
+            let threatReduction = Double(target.currentAttack) * (shouldDefend(state: state) ? 1.5 : 0.8)
+            let score = killBonus + threatReduction
+            if score > bestScore {
+                bestScore = score
+                bestTarget = .boardSlot(idx)
+            }
+        }
+
+        if let enemyGod = state.opponent.godSlot {
+            let killBonus = attackerAttack >= enemyGod.currentHP ? 3.2 : 1.0
+            let godThreat = Double(enemyGod.currentAttack)
+            let godScore = killBonus + godThreat
+            if godScore > bestScore {
+                bestTarget = .god
+            }
+        }
+
+        return bestTarget
+    }
+
+    private func attackValue(for slot: Int, from state: PlayerState) -> Int? {
+        if slot == -1 {
+            return state.godSlot?.currentAttack
+        }
+
+        guard slot >= 0, slot < state.board.count else { return nil }
+        return state.board[slot]?.currentAttack
+    }
+
+    private func boardThreat(of state: PlayerState) -> Int {
+        let boardDamage = state.board.compactMap { $0?.currentAttack }.reduce(0, +)
+        let godDamage = state.godSlot?.currentAttack ?? 0
+        return boardDamage + godDamage
+    }
+
+    private func laneThreatScore(on slot: Int, opponent: PlayerState) -> Int {
+        guard slot >= 0, slot < opponent.board.count else { return 0 }
+        return opponent.board[slot]?.currentAttack ?? 0
+    }
+
+    private func hasAffordableGodAfterKnife(state: AIState) -> Bool {
+        let projectedBlood = state.current.blood + 1 + state.current.pendingBonusBlood
+        return state.current.hand.contains(where: { $0.type == .god && $0.bloodCost <= projectedBlood })
+    }
+}
+
+
+
 
 // MARK: - Sample Decks (starter)
 
