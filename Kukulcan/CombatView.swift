@@ -102,8 +102,8 @@ struct CombatView: View {
     private let handVerticalDragThreshold: CGFloat = 34
     private let handVerticalDragDominanceRatio: CGFloat = 1.15
     private let enemyTurnStepDelay: TimeInterval = 1.4
-    private var combatSceneLeadingPadding: CGFloat { isCompactPortrait ? 8 : 12 }
-    private var combatSceneTrailingPadding: CGFloat { isCompactPortrait ? 58 : 12 }
+    private var combatSceneLeadingPadding: CGFloat { isCompactPortrait ? 2 : 10 }
+    private var combatSceneTrailingPadding: CGFloat { isCompactPortrait ? 20 : 10 }
 
     private var enemyAIConfiguration: EnemyAI.Configuration {
         switch aiLevel {
@@ -327,7 +327,6 @@ struct CombatView: View {
                 .padding(.horizontal, 12)
                 .padding(.top, 10)
                 .padding(.bottom, 10)
-                .background(.ultraThinMaterial)
                 .allowsHitTesting(isPlayerInteractionEnabled)
                 .opacity(isPlayerInteractionEnabled ? 1 : 0.7)
         }
