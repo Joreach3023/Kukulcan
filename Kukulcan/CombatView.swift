@@ -435,13 +435,15 @@ struct CombatView: View {
     private var opponentBoardArea: some View {
         VStack(spacing: 6) {
             HStack(spacing: combatRowSpacing) {
+                // `opponentBoard` est retourné à 180°: le slot fantôme doit être
+                // placé en tête pour rester visuellement à droite après rotation.
+                Color.clear
+                    .frame(width: slotCardWidth, height: slotCardHeight)
+
                 ForEach(engine.opponent.board.indices, id: \.self) { i in
                     let inst = engine.opponent.board[i]
                     slotView(for: inst?.base, hp: inst?.currentHP)
                 }
-
-                Color.clear
-                    .frame(width: slotCardWidth, height: slotCardHeight)
             }
             .frame(width: combatContentWidth, alignment: .leading)
         }
