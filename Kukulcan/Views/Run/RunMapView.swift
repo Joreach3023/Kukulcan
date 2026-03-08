@@ -39,6 +39,44 @@ struct RunMapView: View {
                 runManager.chooseReward(reward)
             }
         }
+        .sheet(item: $runManager.pendingCampfire, onDismiss: {
+            runManager.dismissPendingNodeInteractions()
+        }) { interaction in
+            CampfireChoiceSheet(
+                interaction: interaction,
+                player: runManager.runState?.player,
+                onHeal: {
+                    runManager.applyCampfireHeal(interaction)
+                },
+                onUpgrade: { cardID in
+                    runManager.upgradeCardAtCampfire(cardID, interaction: interaction)
+                }
+            )
+        }
+        .sheet(item: $runManager.pendingShop, onDismiss: {
+            runManager.dismissPendingNodeInteractions()
+        }) { interaction in
+            ShopChoiceSheet(
+                interaction: interaction,
+                player: runManager.runState?.player,
+                onBuyCard: { card in
+                    runManager.buyCard(card, from: interaction)
+                },
+                onBuyRelic: {
+                    runManager.buyRelic(from: interaction)
+                },
+                onRemoveCard: { cardID in
+                    runManager.removeCardFromDeck(cardID, in: interaction)
+                }
+            )
+        }
+        .sheet(item: $runManager.pendingEvent, onDismiss: {
+            runManager.dismissPendingNodeInteractions()
+        }) { interaction in
+            EventChoiceSheet(interaction: interaction) { option in
+                runManager.chooseEventOption(option, in: interaction)
+            }
+        }
         .fullScreenCover(item: $runManager.activeBattle) { battle in
             CombatView(
                 engine: GameEngine(
@@ -66,6 +104,7 @@ struct RunMapView: View {
             Label("HP: \(run.player.currentHP)/\(run.player.maxHP)", systemImage: "heart.fill")
             Label("Gold: \(run.player.gold)", systemImage: "bitcoinsign.circle.fill")
             Label("Deck: \(run.player.deck.count) cartes", systemImage: "rectangle.stack.fill")
+            Label("Reliques: \(run.player.relics.count)", systemImage: "sparkles")
         }
         .font(.headline)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -209,5 +248,130 @@ struct RunMapView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct CampfireChoiceSheet: View {
+    let interaction: CampfireInteraction
+    let player: PlayerRunState?
+    let onHeal: () -> Void
+    let onUpgrade: (UUID) -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Feu de camp")
+                    .font(.title2.bold())
+                Text("Choisissez une seule option.")
+                    .foregroundStyle(.secondary)
+
+                Button("Heal +\(interaction.healAmount) HP") {
+                    onHeal()
+                }
+                .buttonStyle(.borderedProminent)
+
+                Text("Ou améliorez une carte :")
+                    .font(.headline)
+
+                if let upgradableCards = player?.deck.filter({ !$0.isUpgraded }), !upgradableCards.isEmpty {
+                    List(upgradableCards) { instance in
+                        Button {
+                            onUpgrade(instance.id)
+                        } label: {
+                            HStack {
+                                Text(instance.card.name)
+                                Spacer()
+                                Text("ATK \(instance.card.attack) / HP \(instance.card.health)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .listStyle(.plain)
+                } else {
+                    Text("Aucune carte améliorable disponible.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding()
+        }
+    }
+}
+
+private struct ShopChoiceSheet: View {
+    let interaction: ShopInteraction
+    let player: PlayerRunState?
+    let onBuyCard: (Card) -> Void
+    let onBuyRelic: () -> Void
+    let onRemoveCard: (UUID) -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Marchand Maya")
+                    .font(.title2.bold())
+                Text("Choisissez un seul achat pour ce shop.")
+                    .foregroundStyle(.secondary)
+                Text("Or disponible: \(player?.gold ?? 0)")
+                    .font(.headline)
+
+                Text("Acheter une carte (\(interaction.cardCost) or)")
+                    .font(.headline)
+                ForEach(interaction.cardOffers, id: \.id) { card in
+                    Button("\(card.name) • \(card.effect)") {
+                        onBuyCard(card)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled((player?.gold ?? 0) < interaction.cardCost)
+                }
+
+                Divider()
+
+                Button("Acheter relique: \(interaction.relic.name) (\(interaction.relicCost) or)") {
+                    onBuyRelic()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled((player?.gold ?? 0) < interaction.relicCost)
+
+                Divider()
+
+                Text("Supprimer une carte (\(interaction.removeCardCost) or)")
+                    .font(.headline)
+                if let deck = player?.deck, !deck.isEmpty {
+                    List(deck) { instance in
+                        Button("Retirer \(instance.card.name)") {
+                            onRemoveCard(instance.id)
+                        }
+                        .disabled((player?.gold ?? 0) < interaction.removeCardCost)
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .padding()
+        }
+    }
+}
+
+private struct EventChoiceSheet: View {
+    let interaction: EventInteraction
+    let onChoose: (MayaEventOption) -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(interaction.event.title)
+                    .font(.title2.bold())
+                Text(interaction.event.description)
+                    .foregroundStyle(.secondary)
+
+                ForEach(interaction.event.options) { option in
+                    Button(option.text) {
+                        onChoose(option)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .padding()
+        }
     }
 }

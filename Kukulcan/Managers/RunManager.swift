@@ -6,13 +6,39 @@ struct RunBattleContext: Identifiable {
     let enemy: Card
 }
 
+struct CampfireInteraction: Identifiable {
+    let id = UUID()
+    let nodeID: UUID
+    let healAmount: Int
+}
+
+struct ShopInteraction: Identifiable {
+    let id = UUID()
+    let nodeID: UUID
+    let cardOffers: [Card]
+    let cardCost: Int
+    let relic: Relic
+    let relicCost: Int
+    let removeCardCost: Int
+}
+
+struct EventInteraction: Identifiable {
+    let id = UUID()
+    let nodeID: UUID
+    let event: MayaEvent
+}
+
 @MainActor
 final class RunManager: ObservableObject {
     @Published private(set) var runState: RunState?
     @Published var activeBattle: RunBattleContext?
     @Published var pendingRewards: [Reward] = []
+    @Published var pendingCampfire: CampfireInteraction?
+    @Published var pendingShop: ShopInteraction?
+    @Published var pendingEvent: EventInteraction?
 
     private let normalEnemies: [Card] = Array(CardsDB.commons.prefix(3))
+    private let eliteEnemies: [Card] = Array(CardsDB.gods.filter { $0.name != "Kukulcan" }.prefix(3))
     private let bossEnemy: Card = CardsDB.gods.first(where: { $0.name == "Kukulcan" }) ?? CardsDB.gods[0]
 
     func startNewRun() {
@@ -28,6 +54,9 @@ final class RunManager: ObservableObject {
         )
         activeBattle = nil
         pendingRewards = []
+        pendingCampfire = nil
+        pendingShop = nil
+        pendingEvent = nil
     }
 
     func selectNode(_ node: MapNode) {
@@ -41,30 +70,144 @@ final class RunManager: ObservableObject {
         runState = state
 
         switch node.type {
-        case .combat, .elite, .boss:
+        case .combat:
+            startBattle(for: node)
+        case .elite:
+            startBattle(for: node, forceElite: true)
+        case .boss:
             startBattle(for: node)
         case .campfire:
-            state.player.currentHP = min(state.player.maxHP, state.player.currentHP + 8)
-            completeNode(node.id, in: &state)
-            runState = state
+            let healAmount = max(1, Int(Double(state.player.maxHP) * 0.3))
+            pendingCampfire = CampfireInteraction(nodeID: node.id, healAmount: healAmount)
         case .shop:
-            state.player.gold += 30
-            completeNode(node.id, in: &state)
-            runState = state
+            pendingShop = ShopInteraction(
+                nodeID: node.id,
+                cardOffers: randomShopCards(),
+                cardCost: 65,
+                relic: randomRelic(),
+                relicCost: 110,
+                removeCardCost: 55
+            )
         case .event:
-            state.player.gold += 15
-            state.player.currentHP = min(state.player.maxHP, state.player.currentHP + 3)
-            completeNode(node.id, in: &state)
-            runState = state
+            if let event = MayaEventCatalog.events.randomElement() {
+                pendingEvent = EventInteraction(nodeID: node.id, event: event)
+            }
         }
     }
 
-    func startBattle(for node: MapNode) {
+    func applyCampfireHeal(_ interaction: CampfireInteraction) {
+        guard var state = runState else { return }
+        state.player.currentHP = min(state.player.maxHP, state.player.currentHP + interaction.healAmount)
+        completeNode(interaction.nodeID, in: &state)
+        runState = state
+        pendingCampfire = nil
+    }
+
+    func upgradeCardAtCampfire(_ cardID: UUID, interaction: CampfireInteraction) {
+        guard var state = runState,
+              let index = state.player.deck.firstIndex(where: { $0.id == cardID }),
+              !state.player.deck[index].isUpgraded else { return }
+
+        state.player.deck[index].isUpgraded = true
+        state.player.deck[index].card = upgradedCard(from: state.player.deck[index].card)
+        completeNode(interaction.nodeID, in: &state)
+        runState = state
+        pendingCampfire = nil
+    }
+
+    func buyCard(_ card: Card, from interaction: ShopInteraction) {
+        guard var state = runState, state.player.gold >= interaction.cardCost else { return }
+
+        state.player.gold -= interaction.cardCost
+        state.player.deck.append(RunCardInstance(card: card))
+        completeNode(interaction.nodeID, in: &state)
+        runState = state
+        pendingShop = nil
+    }
+
+    func buyRelic(from interaction: ShopInteraction) {
+        guard var state = runState, state.player.gold >= interaction.relicCost else { return }
+
+        state.player.gold -= interaction.relicCost
+        state.player.relics.append(interaction.relic)
+        completeNode(interaction.nodeID, in: &state)
+        runState = state
+        pendingShop = nil
+    }
+
+    func removeCardFromDeck(_ cardID: UUID, in interaction: ShopInteraction) {
+        guard var state = runState,
+              state.player.gold >= interaction.removeCardCost,
+              let index = state.player.deck.firstIndex(where: { $0.id == cardID }) else { return }
+
+        state.player.gold -= interaction.removeCardCost
+        state.player.deck.remove(at: index)
+        completeNode(interaction.nodeID, in: &state)
+        runState = state
+        pendingShop = nil
+    }
+
+    func chooseEventOption(_ option: MayaEventOption, in interaction: EventInteraction) {
+        guard var state = runState else { return }
+
+        var triggerEliteFight = false
+        for effect in option.effects {
+            switch effect {
+            case .gainGold(let amount):
+                state.player.gold += amount
+            case .loseGold(let amount):
+                state.player.gold = max(0, state.player.gold - amount)
+            case .gainHP(let amount):
+                state.player.currentHP = min(state.player.maxHP, state.player.currentHP + amount)
+            case .loseHP(let amount):
+                state.player.currentHP = max(0, state.player.currentHP - amount)
+            case .gainRelic:
+                state.player.relics.append(randomRelic())
+            case .gainCard(let rarity):
+                if let card = randomCard(rarity: rarity) {
+                    state.player.deck.append(RunCardInstance(card: card))
+                }
+            case .removeCard:
+                if !state.player.deck.isEmpty {
+                    state.player.deck.remove(at: Int.random(in: 0..<state.player.deck.count))
+                }
+            case .upgradeCard:
+                upgradeRandomCard(in: &state.player.deck)
+            case .startEliteFight:
+                triggerEliteFight = true
+            }
+        }
+
+        if state.player.currentHP <= 0 {
+            state.status = .gameOver
+            runState = state
+            pendingEvent = nil
+            return
+        }
+
+        completeNode(interaction.nodeID, in: &state)
+        runState = state
+        pendingEvent = nil
+
+        if triggerEliteFight, let node = state.nodes.first(where: { $0.id == interaction.nodeID }) {
+            startBattle(for: node, forceElite: true)
+        }
+    }
+
+    func dismissPendingNodeInteractions() {
+        pendingCampfire = nil
+        pendingShop = nil
+        pendingEvent = nil
+    }
+
+    func startBattle(for node: MapNode, forceElite: Bool = false) {
         guard var state = runState else { return }
 
         let enemy: Card
         if node.type == .boss {
             enemy = bossEnemy
+        } else if node.type == .elite || forceElite {
+            enemy = eliteEnemies.randomElement() ?? bossEnemy
         } else {
             enemy = normalEnemies.randomElement() ?? CardsDB.commons[0]
         }
@@ -120,6 +263,9 @@ final class RunManager: ObservableObject {
         state.status = victory ? .victory : .gameOver
         activeBattle = nil
         pendingRewards = []
+        pendingCampfire = nil
+        pendingShop = nil
+        pendingEvent = nil
         runState = state
     }
 
@@ -142,6 +288,45 @@ final class RunManager: ObservableObject {
                 state.nodes[nextIndex].isUnlocked = true
             }
         }
+    }
+
+    private func randomShopCards() -> [Card] {
+        Array((CardsDB.commons + CardsDB.rituals + CardsDB.gods).shuffled().prefix(3))
+    }
+
+    private func randomRelic() -> Relic {
+        MayaRelicPool.all.randomElement() ?? Relic(name: "Amulette de jade", effectDescription: "+1 pioche au début du combat")
+    }
+
+    private func randomCard(rarity: Rarity?) -> Card? {
+        let pool = CardsDB.commons + CardsDB.rituals + CardsDB.gods
+        if let rarity {
+            return pool.filter { $0.rarity == rarity }.randomElement() ?? pool.randomElement()
+        }
+        return pool.randomElement()
+    }
+
+    private func upgradeRandomCard(in deck: inout [RunCardInstance]) {
+        let upgradable = deck.enumerated().filter { !$0.element.isUpgraded }
+        guard let target = upgradable.randomElement()?.offset else { return }
+        deck[target].isUpgraded = true
+        deck[target].card = upgradedCard(from: deck[target].card)
+    }
+
+    private func upgradedCard(from card: Card) -> Card {
+        Card(
+            id: card.id,
+            name: card.name + "+",
+            type: card.type,
+            rarity: card.rarity,
+            imageName: card.imageName,
+            attack: card.attack + (card.type == .ritual ? 0 : 1),
+            health: card.health + (card.type == .common ? 1 : 0),
+            ritual: card.ritual,
+            bloodCost: max(0, card.bloodCost - (card.type == .god ? 1 : 0)),
+            effect: card.effect + " (Améliorée)",
+            lore: card.lore
+        )
     }
 
     private func generateMapNodes() -> [MapNode] {
