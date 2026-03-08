@@ -797,9 +797,9 @@ struct StarterFactory {
                      effect: "Si tue une carte : pioche 1.")]
 
         // Rituels
-        d += [ritual(.obsidianKnife, name: "Couteau d’obsidienne", img: "archer_maladroit", effect: "Sacrifie 1 commune posée, pioche 2.")]
-        d += [ritual(.bloodAltar, name: "Autel de sang", img: "disciple_zele", effect: "Prochain sacrifice +2 sang.")]
-        d += [ritual(.forestCharm, name: "Charme forestier", img: "eclaireur_perdu", effect: "+1/+1 à une commune.")]
+        d += [ritual(.obsidianKnife, name: "Couteau d’obsidienne", img: "couteau_obsidienne", effect: "Sacrifie 1 commune posée, pioche 2.")]
+        d += [ritual(.bloodAltar, name: "Autel de sang", img: "autel_de_sang", effect: "Prochain sacrifice +2 sang.")]
+        d += [ritual(.forestCharm, name: "Charme forestier", img: "danse_macabre", effect: "+1/+1 à une commune.")]
 
         // Dieux (tes assets existants)
         d += [god("Ix Chel", atk: 6, hp: 7, img: "ix_chel", cost: 7,

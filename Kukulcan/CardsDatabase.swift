@@ -135,19 +135,19 @@ struct CardsDB {
     static let rituals: [Card] = [
         ritual("Couteau d’obsidienne",
                kind: .obsidianKnife,
-               img: "disciple_zele", // placeholder d’illustration
+               img: "couteau_obsidienne",
                rarity: .rare,
                effect: "Sacrifie 1 commune posée, pioche 2.",
                lore: "Tranchant comme la nuit, il ouvre la voie aux dieux."),
         ritual("Autel de sang",
                kind: .bloodAltar,
-               img: "eclaireur_perdu",
+               img: "autel_de_sang",
                rarity: .epic,
                effect: "Prochain sacrifice : +2 sang.",
                lore: "Chaque pierre absorbe l’offrande."),
         ritual("Charme forestier",
                kind: .forestCharm,
-               img: "archer_maladroit",
+               img: "danse_macabre",
                rarity: .rare,
                effect: "+1/+1 à une commune.",
                lore: "Un murmure des anciens esprits.")
@@ -213,4 +213,3 @@ struct CardsDB {
         return result
     }
 }
-
