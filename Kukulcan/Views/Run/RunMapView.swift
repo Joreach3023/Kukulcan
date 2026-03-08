@@ -17,23 +17,43 @@ struct RunMapView: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            if let run = runManager.runState {
-                header(run: run)
-                mapCanvas(run: run)
-                statusFooter(run: run)
-            } else {
-                Spacer()
-                Button("New Run") {
-                    runManager.startNewRun()
+        GeometryReader { geo in
+            let bottomInset = geo.safeAreaInsets.bottom
+
+            ZStack {
+                mapBackground
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .clipped()
+                    .overlay {
+                        LinearGradient(
+                            colors: [.black.opacity(0.5), .clear, .black.opacity(0.72)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+
+                VStack(spacing: 12) {
+                    if let run = runManager.runState {
+                        header(run: run)
+                        mapCanvas(run: run)
+                        statusFooter(run: run)
+                            .padding(.bottom, max(8, bottomInset + 6))
+                    } else {
+                        Spacer()
+                        Button("New Run") {
+                            runManager.startNewRun()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                        Spacer()
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.orange)
-                Spacer()
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
             }
         }
-        .padding()
         .navigationTitle("Roguelike")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("New Run") {
@@ -111,39 +131,50 @@ struct RunMapView: View {
 
     private func header(run: RunState) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("HP: \(run.player.currentHP)/\(run.player.maxHP)", systemImage: "heart.fill")
-            Label("Gold: \(run.player.gold)", systemImage: "bitcoinsign.circle.fill")
-            Label("Deck: \(run.player.deck.count) cartes", systemImage: "rectangle.stack.fill")
-            Label("Reliques: \(run.player.relics.count)", systemImage: "sparkles")
+            HStack(spacing: 8) {
+                hudBadge(text: "\(run.player.currentHP)/\(run.player.maxHP)", icon: "heart.fill", tint: .red)
+                hudBadge(text: "\(run.player.gold)", icon: "bitcoinsign.circle.fill", tint: .yellow)
+            }
+
+            HStack(spacing: 8) {
+                compactBadge(text: "Deck \(run.player.deck.count)", icon: "rectangle.stack.fill")
+                compactBadge(text: "Reliques \(run.player.relics.count)", icon: "sparkles")
+            }
         }
-        .font(.headline)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func mapCanvas(run: RunState) -> some View {
-        ScrollView {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let height = proxy.size.height
+
             GeometryReader { proxy in
-                let width = proxy.size.width
-                let height = width / mapAspectRatio
+                let contentHeight = max(height, width / mapAspectRatio)
 
                 ZStack {
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(.black.opacity(0.18))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+
                     mapBackground
-                        .frame(width: width, height: height)
+                        .frame(width: width, height: contentHeight)
                         .clipShape(RoundedRectangle(cornerRadius: 18))
                         .overlay {
                             RoundedRectangle(cornerRadius: 18)
                                 .stroke(Color.orange.opacity(0.45), lineWidth: 1)
                         }
 
-                    connectionsLayer(run: run, size: CGSize(width: width, height: height))
+                    connectionsLayer(run: run, size: CGSize(width: width, height: contentHeight))
 
                     ForEach(run.nodes) { node in
-                        nodeMarker(node: node, run: run, size: CGSize(width: width, height: height))
+                        nodeMarker(node: node, run: run, size: CGSize(width: width, height: contentHeight))
                     }
                 }
             }
-            .frame(height: UIScreen.main.bounds.width / mapAspectRatio)
+            .frame(height: max(height, width / mapAspectRatio))
         }
+        .frame(maxHeight: .infinity)
     }
 
     private var mapBackground: some View {
@@ -325,7 +356,33 @@ struct RunMapView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .font(.caption.bold())
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func hudBadge(text: String, icon: String, tint: Color) -> some View {
+        Label(text, systemImage: icon)
+            .font(.headline.bold())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.black.opacity(0.45))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(tint.opacity(0.85), lineWidth: 1))
+            )
+    }
+
+    private func compactBadge(text: String, icon: String) -> some View {
+        Label(text, systemImage: icon)
+            .font(.caption.bold())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(.black.opacity(0.42), in: Capsule())
     }
 }
 
