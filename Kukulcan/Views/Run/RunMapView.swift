@@ -145,31 +145,20 @@ struct RunMapView: View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let height = proxy.size.height
+            let contentHeight = max(height, width / mapAspectRatio)
 
-            GeometryReader { proxy in
-                let contentHeight = max(height, width / mapAspectRatio)
+            ZStack {
+                mapBackground
+                    .frame(width: width, height: contentHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
 
-                ZStack {
-                    RoundedRectangle(cornerRadius: 18)
-                        .fill(.black.opacity(0.18))
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                connectionsLayer(run: run, size: CGSize(width: width, height: contentHeight))
 
-                    mapBackground
-                        .frame(width: width, height: contentHeight)
-                        .clipShape(RoundedRectangle(cornerRadius: 18))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 18)
-                                .stroke(Color.orange.opacity(0.45), lineWidth: 1)
-                        }
-
-                    connectionsLayer(run: run, size: CGSize(width: width, height: contentHeight))
-
-                    ForEach(run.nodes) { node in
-                        nodeMarker(node: node, run: run, size: CGSize(width: width, height: contentHeight))
-                    }
+                ForEach(run.nodes) { node in
+                    nodeMarker(node: node, run: run, size: CGSize(width: width, height: contentHeight))
                 }
             }
-            .frame(height: max(height, width / mapAspectRatio))
+            .frame(height: contentHeight)
         }
         .frame(maxHeight: .infinity)
     }
@@ -328,10 +317,12 @@ struct RunMapView: View {
     private func mapPoint(for node: MapNode, in size: CGSize) -> CGPoint {
         let rows = max(1, (runManager.runState?.nodes.map(\.row).max() ?? 1))
         let xStep = size.width / max(1, mapColumns - 1)
-        let yStep = size.height / CGFloat(rows)
+        let yStep = size.height / CGFloat(rows + 1)
+        let topPadding = yStep * 0.75
+        let bottomPadding = yStep * 1.15
         let x = CGFloat(node.column) * xStep
-        let y = size.height - CGFloat(node.row) * yStep
-        return CGPoint(x: x, y: y)
+        let y = size.height - bottomPadding - CGFloat(node.row) * yStep
+        return CGPoint(x: x, y: max(topPadding, y))
     }
 
     private func statusFooter(run: RunState) -> some View {
