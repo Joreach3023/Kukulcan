@@ -120,11 +120,77 @@ enum MayaEventCatalog {
 
 enum MayaRelicPool {
     static let all: [Relic] = [
-        Relic(name: "Idole solaire", effectDescription: "+1 gold après chaque combat"),
-        Relic(name: "Crocs de jaguar", effectDescription: "+1 attaque au premier tour"),
-        Relic(name: "Plume de Kukulcan", effectDescription: "Soigne 2 HP après un combat elite"),
-        Relic(name: "Masque rituel", effectDescription: "Cartes rares plus fréquentes aux récompenses"),
-        Relic(name: "Bassin lunaire", effectDescription: "+5 HP max"),
-        Relic(name: "Totem d'obsidienne", effectDescription: "Réduit le coût d'une carte au shop")
+        Relic(
+            relicID: .pakalFuneraryMask,
+            name: "Masque funéraire de Pakal",
+            description: "Masque de jade enterré avec le roi Pakal de Palenque.",
+            effect: "Lorsque votre vie tombe sous 50 %, gagnez +2 pouvoir pendant 2 tours.",
+            rarity: .rare,
+            image: "relic_placeholder"
+        ),
+        Relic(
+            relicID: .sacredCodex,
+            name: "Codex sacré",
+            description: "Un ancien manuscrit maya contenant des prophéties et des rituels.",
+            effect: "Après un événement, choisissez entre 3 cartes au lieu de 2.",
+            rarity: .rare,
+            image: "relic_placeholder"
+        ),
+        Relic(
+            relicID: .palenqueRoyalJade,
+            name: "Jade royal de Palenque",
+            description: "Un bijou porté par les rois mayas, symbole de vie et de pouvoir.",
+            effect: "+1 énergie au début du combat.",
+            rarity: .rare,
+            image: "relic_placeholder"
+        ),
+        Relic(
+            relicID: .tzolkinCalendar,
+            name: "Calendrier Tzolk’in",
+            description: "Le calendrier sacré de 260 jours utilisé par les prêtres mayas.",
+            effect: "Tous les 3 tours, gagnez +2 énergie.",
+            rarity: .legendary,
+            image: "relic_placeholder"
+        ),
+        Relic(
+            relicID: .quetzalFeather,
+            name: "Plume de Quetzal",
+            description: "Plume sacrée de l’oiseau quetzal, symbole de royauté.",
+            effect: "+2 esquive au début du combat.",
+            rarity: .common,
+            image: "relic_placeholder"
+        ),
+        Relic(
+            relicID: .ceremonialDrum,
+            name: "Tambour cérémoniel",
+            description: "Tambour utilisé lors des cérémonies et rituels religieux.",
+            effect: "Les invocations ou alliés gagnent +1 attaque.",
+            rarity: .common,
+            image: "relic_placeholder"
+        ),
+        Relic(
+            relicID: .jadeSerpent,
+            name: "Serpent de jade",
+            description: "Amulette représentant Kukulcan, le serpent à plumes.",
+            effect: "Toutes les 3 attaques infligent +4 dégâts bonus.",
+            rarity: .legendary,
+            image: "relic_placeholder"
+        ),
+        Relic(
+            relicID: .obsidianOffering,
+            name: "Offrande d’obsidienne",
+            description: "Fragment d’obsidienne utilisé dans les offrandes aux dieux.",
+            effect: "Chaque ennemi vaincu donne +2 or supplémentaire.",
+            rarity: .common,
+            image: "relic_placeholder"
+        ),
+        Relic(
+            relicID: .sunStone,
+            name: "Pierre solaire",
+            description: "Pierre gravée représentant le pouvoir du soleil.",
+            effect: "Au début du combat, inflige 3 dégâts à tous les ennemis.",
+            rarity: .rare,
+            image: "relic_placeholder"
+        )
     ]
 }
