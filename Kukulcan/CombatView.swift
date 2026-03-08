@@ -102,8 +102,7 @@ struct CombatView: View {
     private let handVerticalDragThreshold: CGFloat = 34
     private let handVerticalDragDominanceRatio: CGFloat = 1.15
     private let enemyTurnStepDelay: TimeInterval = 1.4
-    private var combatSceneLeadingPadding: CGFloat { isCompactPortrait ? 2 : 10 }
-    private var combatSceneTrailingPadding: CGFloat { isCompactPortrait ? 20 : 10 }
+    private var combatSceneHorizontalPadding: CGFloat { isCompactPortrait ? 12 : 10 }
 
     private var enemyAIConfiguration: EnemyAI.Configuration {
         switch aiLevel {
@@ -226,11 +225,11 @@ struct CombatView: View {
 
                     Spacer(minLength: 0)
                 }
-                .padding(.leading, combatSceneLeadingPadding)
-                .padding(.trailing, combatSceneTrailingPadding)
+                .frame(maxWidth: 560)
+                .padding(.horizontal, combatSceneHorizontalPadding)
                 .padding(.top, 8)
                 .padding(.bottom, handCardHeight + max(20, geometry.safeAreaInsets.bottom + 12))
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity)
 
                 if showBloodRiver {
                     BloodRiverView()
@@ -342,9 +341,6 @@ struct CombatView: View {
                 }
             }
         }
-        .overlay(alignment: .topTrailing) {
-            combatControlsOverlay
-        }
         .fullScreenCover(item: $selectedCard) { card in
             CardDetailView(card: card) { selectedCard = nil }
         }
@@ -369,30 +365,6 @@ struct CombatView: View {
                 }
             }
         }
-    }
-
-    private var combatControlsOverlay: some View {
-        VStack(spacing: 8) {
-            Button("Fin du tour") {
-                endPlayerTurnAndRunEnemySequence()
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .disabled(!isPlayerInteractionEnabled)
-
-            Button("Quitter") {
-                quitCombat()
-            }
-            .buttonStyle(.bordered)
-            .tint(.red)
-        }
-        .font(.caption.bold())
-        .padding(10)
-        .background(.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
-        .padding(.trailing, 10)
-        .padding(.top, 8)
     }
 
     // MARK: - Header (scores / sang)
@@ -579,7 +551,7 @@ struct CombatView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 6)
         .padding(.vertical, 8)
         .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 14))
