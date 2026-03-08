@@ -254,7 +254,7 @@ struct CombatView: View {
                 engine.start()
             }
             queueOpeningHandAnimationIfNeeded()
-            AudioManager.shared.play(.combat)
+            AudioManager.shared.transitionToMusic(named: AudioManager.Track.combat.rawValue)
         }
         .onDisappear {
             NotificationCenter.default.post(name: .combatViewDidDisappear, object: nil)
