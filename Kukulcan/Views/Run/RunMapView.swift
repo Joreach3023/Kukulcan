@@ -4,7 +4,8 @@ import UIKit
 struct RunMapView: View {
     @StateObject private var runManager = RunManager()
 
-    private let mapAspectRatio: CGFloat = 768.0 / 1365.0
+    private let mapAspectRatio: CGFloat = 0.6
+    private let mapColumns: CGFloat = 7
 
     var body: some View {
         VStack(spacing: 16) {
@@ -157,8 +158,8 @@ struct RunMapView: View {
                     guard let nextNode = run.nodes.first(where: { $0.id == nextID }) else { continue }
 
                     var path = Path()
-                    let from = CGPoint(x: node.x * size.width, y: node.y * size.height)
-                    let to = CGPoint(x: nextNode.x * size.width, y: nextNode.y * size.height)
+                    let from = mapPoint(for: node, in: size)
+                    let to = mapPoint(for: nextNode, in: size)
                     path.move(to: from)
                     path.addLine(to: to)
 
@@ -204,7 +205,7 @@ struct RunMapView: View {
         }
         .buttonStyle(.plain)
         .disabled(!isSelectable || run.isFinished)
-        .position(x: node.x * size.width, y: node.y * size.height)
+        .position(mapPoint(for: node, in: size))
         .accessibilityLabel("\(node.type.title)")
     }
 
@@ -226,6 +227,16 @@ struct RunMapView: View {
             return .red
         }
         return isSelectable ? .orange : .gray
+    }
+
+
+    private func mapPoint(for node: MapNode, in size: CGSize) -> CGPoint {
+        let rows = max(1, (runManager.runState?.nodes.map(\.row).max() ?? 1))
+        let xStep = size.width / max(1, mapColumns - 1)
+        let yStep = size.height / CGFloat(rows)
+        let x = CGFloat(node.column) * xStep
+        let y = size.height - CGFloat(node.row) * yStep
+        return CGPoint(x: x, y: y)
     }
 
     private func statusFooter(run: RunState) -> some View {
