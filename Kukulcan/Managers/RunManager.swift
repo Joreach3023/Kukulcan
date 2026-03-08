@@ -80,10 +80,11 @@ final class RunManager: ObservableObject {
             let healAmount = max(1, Int(Double(state.player.maxHP) * 0.3))
             pendingCampfire = CampfireInteraction(nodeID: node.id, healAmount: healAmount)
         case .shop:
+            let cardCostModifier = hasRelic(named: "Totem d'obsidienne", in: state.player) ? 15 : 0
             pendingShop = ShopInteraction(
                 nodeID: node.id,
                 cardOffers: randomShopCards(),
-                cardCost: 65,
+                cardCost: max(0, 65 - cardCostModifier),
                 relic: randomRelic(),
                 relicCost: 110,
                 removeCardCost: 55
@@ -94,7 +95,7 @@ final class RunManager: ObservableObject {
             }
         case .treasure:
             guard var state = runState else { return }
-            state.player.relics.append(randomRelic())
+            grantRelic(randomRelic(), to: &state.player)
             state.player.gold += 40
             completeNode(node.id, in: &state)
             runState = state
@@ -135,7 +136,7 @@ final class RunManager: ObservableObject {
         guard var state = runState, state.player.gold >= interaction.relicCost else { return }
 
         state.player.gold -= interaction.relicCost
-        state.player.relics.append(interaction.relic)
+        grantRelic(interaction.relic, to: &state.player)
         completeNode(interaction.nodeID, in: &state)
         runState = state
         pendingShop = nil
@@ -168,7 +169,7 @@ final class RunManager: ObservableObject {
             case .loseHP(let amount):
                 state.player.currentHP = max(0, state.player.currentHP - amount)
             case .gainRelic:
-                state.player.relics.append(randomRelic())
+                grantRelic(randomRelic(), to: &state.player)
             case .gainCard(let rarity):
                 if let card = randomCard(rarity: rarity) {
                     state.player.deck.append(RunCardInstance(card: card))
@@ -230,7 +231,14 @@ final class RunManager: ObservableObject {
 
         if let node = state.nodes.first(where: { $0.id == nodeID }) {
             state.currentNodeID = nodeID
-            state.player.gold += node.type == .boss ? 100 : 25
+            let baseGold = node.type == .boss ? 100 : 25
+            let relicGoldBonus = hasRelic(named: "Idole solaire", in: state.player) ? 1 : 0
+            state.player.gold += baseGold + relicGoldBonus
+
+            if node.type == .elite,
+               hasRelic(named: "Plume de Kukulcan", in: state.player) {
+                state.player.currentHP = min(state.player.maxHP, state.player.currentHP + 2)
+            }
 
             if node.type == .boss {
                 state.status = .victory
@@ -244,7 +252,7 @@ final class RunManager: ObservableObject {
         activeBattle = nil
         state.status = .choosingReward
         runState = state
-        pendingRewards = buildCombatRewards()
+        pendingRewards = buildCombatRewards(for: state.player)
     }
 
     func chooseReward(_ reward: Reward) {
@@ -335,8 +343,29 @@ final class RunManager: ObservableObject {
         )
     }
 
-    private func buildCombatRewards() -> [Reward] {
-        let offeredCards = Array((CardsDB.commons + CardsDB.rituals).shuffled().prefix(2))
+    private func buildCombatRewards(for player: PlayerRunState) -> [Reward] {
+        let basePool = CardsDB.commons + CardsDB.rituals
+        let rareBoost: [Card]
+        if hasRelic(named: "Masque rituel", in: player) {
+            rareBoost = Array(repeating: CardsDB.gods, count: 2).flatMap { $0 }
+        } else {
+            rareBoost = []
+        }
+
+        let offeredCards = Array((basePool + rareBoost).shuffled().prefix(2))
         return offeredCards.map(Reward.card) + [.gold(20)]
+    }
+
+    private func grantRelic(_ relic: Relic, to player: inout PlayerRunState) {
+        player.relics.append(relic)
+
+        if relic.name == "Bassin lunaire" {
+            player.maxHP += 5
+            player.currentHP += 5
+        }
+    }
+
+    private func hasRelic(named relicName: String, in player: PlayerRunState) -> Bool {
+        player.relics.contains(where: { $0.name == relicName })
     }
 }
