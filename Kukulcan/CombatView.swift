@@ -775,9 +775,14 @@ struct CombatView: View {
             case .ritual:
                 Button {
                     guard isPlayerInteractionEnabled else { return }
-                    pendingRitualHandIndex = index
-                    ritualTargetSlot = nil
-                    showTargetPickerForRitual = true
+                    guard let kind = c.ritual else { return }
+                    if ritualNeedsTarget(kind) {
+                        pendingRitualHandIndex = index
+                        ritualTargetSlot = firstOccupiedBoardSlot()
+                        showTargetPickerForRitual = true
+                    } else {
+                        engine.playRitual(handIndex: index)
+                    }
                 } label: { labelChip("Rituel", system: "wand.and.stars") }
                 .disabled(!isPlayerInteractionEnabled)
 
@@ -1055,6 +1060,34 @@ struct CombatView: View {
             .background(Capsule().fill(.ultraThinMaterial))
     }
 
+    private func ritualNeedsTarget(_ kind: RitualKind) -> Bool {
+        switch kind {
+        case .obsidianKnife, .forestCharm:
+            return true
+        case .bloodAltar:
+            return false
+        }
+    }
+
+    private func firstOccupiedBoardSlot() -> Int? {
+        engine.current.board.firstIndex(where: { $0 != nil })
+    }
+
+    private var pendingRitualKind: RitualKind? {
+        guard let idx = pendingRitualHandIndex,
+              idx >= 0,
+              idx < engine.current.hand.count else {
+            return nil
+        }
+        return engine.current.hand[idx].ritual
+    }
+
+    private var availableRitualTargetSlots: [Int] {
+        engine.current.board.enumerated().compactMap { offset, card in
+            card == nil ? nil : offset
+        }
+    }
+
     // MARK: - Sheets (cibles)
     private var ritualTargetSheet: some View {
         NavigationStack {
@@ -1062,27 +1095,45 @@ struct CombatView: View {
                 Text("Choisir une cible pour le rituel")
                     .font(.headline)
 
-                Picker("Emplacement", selection: Binding(get: {
-                    ritualTargetSlot ?? -1
-                }, set: { ritualTargetSlot = ($0 == -1 ? nil : $0) })) {
-                    Text("Aucune (effet global)").tag(-1)
-                    Text("Empl. 1").tag(0)
-                    Text("Empl. 2").tag(1)
-                    Text("Empl. 3").tag(2)
+                if let kind = pendingRitualKind, ritualNeedsTarget(kind) {
+                    Picker("Emplacement", selection: Binding(get: {
+                        ritualTargetSlot ?? -1
+                    }, set: { ritualTargetSlot = ($0 == -1 ? nil : $0) })) {
+                        ForEach(availableRitualTargetSlots, id: \.self) { slot in
+                            Text("Empl. \(slot + 1)").tag(slot)
+                        }
+                    }
+                    .pickerStyle(.wheel)
+
+                    if availableRitualTargetSlots.isEmpty {
+                        Text("Aucune commune en jeu : ce rituel ne peut pas être lancé.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                } else {
+                    Text("Ce rituel n'a pas besoin de cible.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-                .pickerStyle(.wheel)
 
                 HStack {
-                    Button("Annuler") { showTargetPickerForRitual = false }
+                    Button("Annuler") {
+                        pendingRitualHandIndex = nil
+                        ritualTargetSlot = nil
+                        showTargetPickerForRitual = false
+                    }
                     Spacer()
                     Button("Jouer") {
                         if let handIdx = pendingRitualHandIndex {
                             engine.playRitual(handIndex: handIdx, targetSlot: ritualTargetSlot)
                         }
                         pendingRitualHandIndex = nil
+                        ritualTargetSlot = nil
                         showTargetPickerForRitual = false
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled((pendingRitualKind.map(ritualNeedsTarget) ?? false) && ritualTargetSlot == nil)
                 }
             }
             .padding()
