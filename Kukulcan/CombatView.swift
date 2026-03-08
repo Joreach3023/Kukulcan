@@ -150,7 +150,7 @@ struct CombatView: View {
     private var deckCardHeight: CGFloat { slotCardHeight }
     private var handCardWidth: CGFloat { isCompactPortrait ? 104 : 92 }
     private var handCardHeight: CGFloat { handCardWidth * 1.4 }
-    private var handCardSpacing: CGFloat { isCompactPortrait ? -16 : -20 }
+    private var handCardSpacing: CGFloat { isCompactPortrait ? -48 : -60 }
     private let handVerticalDragThreshold: CGFloat = 34
     private let handVerticalDragDominanceRatio: CGFloat = 1.15
     private let enemyTurnStepDelay: TimeInterval = 1.4
@@ -513,6 +513,7 @@ struct CombatView: View {
                 ForEach(Array(enemyState.board.indices.reversed()), id: \.self) { i in
                     let inst = enemyState.board[i]
                     slotView(for: inst?.base, hp: inst?.currentHP)
+                        .rotationEffect(.degrees(180))
                 }
             }
             .frame(width: combatContentWidth, alignment: .leading)
@@ -577,6 +578,7 @@ struct CombatView: View {
 
             VStack(spacing: 6) {
                 slotView(for: enemyState.godSlot?.base, hp: enemyState.godSlot?.currentHP)
+                    .rotationEffect(.degrees(180))
                     .frame(width: slotCardWidth, height: slotCardHeight)
             }
 
@@ -762,11 +764,12 @@ struct CombatView: View {
 
     // MARK: - Main du joueur
     private var handStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack {
-                Spacer(minLength: 0)
+        GeometryReader { geo in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack {
+                    Spacer(minLength: 0)
 
-                HStack(spacing: handCardSpacing) {
+                    HStack(spacing: handCardSpacing) {
                     ForEach(playerState.hand.indices, id: \.self) { idx in
                         let c = playerState.hand[idx]
                         let isHovered = hoveredHandCardID == c.id
@@ -862,11 +865,12 @@ struct CombatView: View {
                                 .padding(.bottom, 6)
                         }
                     }
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
+                .padding(.horizontal, 4)
+                .frame(minWidth: geo.size.width)
             }
-            .padding(.horizontal, 4)
-            .frame(maxWidth: .infinity)
         }
         .frame(minHeight: handCardHeight + 34, alignment: .center)
         .onPreferenceChange(HandCardFramePreferenceKey.self) { frames in
