@@ -371,7 +371,7 @@ final class GameEngine: ObservableObject {
         if currentPlayerIsP1 { p2 = s } else { p1 = s }
     }
 
-    private func drawForCurrent(_ n: Int) {
+    func drawForCurrent(_ n: Int) {
         let drawn: [Card]
         if currentPlayerIsP1 {
             drawn = p1.draw(n)
