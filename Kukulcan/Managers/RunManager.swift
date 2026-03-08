@@ -297,18 +297,27 @@ final class RunManager: ObservableObject {
     }
 
     private func isNodeSelectable(_ node: MapNode, in state: RunState) -> Bool {
-        node.isUnlocked && !node.isCompleted && state.status == .onMap && !state.isFinished
+        node.isUnlocked && !node.isCompleted && !node.isDisabled && state.status == .onMap && !state.isFinished
     }
 
     private func completeNode(_ nodeID: UUID, in state: inout RunState) {
         guard let nodeIndex = state.nodes.firstIndex(where: { $0.id == nodeID }) else { return }
 
         state.nodes[nodeIndex].isCompleted = true
+        disableCompetingNodes(in: state.nodes[nodeIndex].row, selectedNodeID: nodeID, state: &state)
         let nextIDs = state.nodes[nodeIndex].nextNodeIDs
         for nextID in nextIDs {
             if let nextIndex = state.nodes.firstIndex(where: { $0.id == nextID }) {
                 state.nodes[nextIndex].isUnlocked = true
             }
+        }
+    }
+
+
+    private func disableCompetingNodes(in row: Int, selectedNodeID: UUID, state: inout RunState) {
+        for index in state.nodes.indices where state.nodes[index].row == row && state.nodes[index].id != selectedNodeID && !state.nodes[index].isCompleted {
+            state.nodes[index].isUnlocked = false
+            state.nodes[index].isDisabled = true
         }
     }
 

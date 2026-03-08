@@ -3,12 +3,15 @@ import Foundation
 struct MapGenerator {
     private let rows: Int
     private let columns: Int
-    private let pathCount: Int
 
-    init(rows: Int = 15, columns: Int = 7, pathCount: Int = 6) {
+    private enum Config {
+        static let startNodeCount = 3
+        static let startNodeMinimumSpacing = 2
+    }
+
+    init(rows: Int = 15, columns: Int = 7) {
         self.rows = max(10, rows)
         self.columns = max(5, columns)
-        self.pathCount = max(3, pathCount)
     }
 
     func generateActMap(seed: Int? = nil) -> MapGraph {
@@ -20,7 +23,7 @@ struct MapGenerator {
         let rowToColumns = buildRowToColumns(from: adjacency)
         let startRow = 0
         let bossRow = rows - 1
-        let startColumns = rowToColumns[startRow]?.sorted() ?? []
+        let startColumns = (rowToColumns[startRow]?.sorted() ?? []).prefix(Config.startNodeCount)
         let bossColumn = columns / 2
 
         var idsByPosition: [NodePosition: UUID] = [:]
@@ -48,7 +51,8 @@ struct MapGenerator {
                         type: types[position] ?? .combat,
                         nextNodeIDs: nextIDs,
                         isUnlocked: row == startRow,
-                        isCompleted: false
+                        isCompleted: false,
+                        isDisabled: false
                     )
                 )
             }
@@ -62,7 +66,7 @@ struct MapGenerator {
 
     private func generateStructure(rng: inout SeededRandomNumberGenerator) -> [NodePosition: Set<NodePosition>] {
         var edges: [NodePosition: Set<NodePosition>] = [:]
-        let startColumns = uniqueRandomColumns(count: min(pathCount, columns), in: columns, rng: &rng).sorted()
+        let startColumns = spacedStartColumns(in: columns, rng: &rng)
 
         for startColumn in startColumns {
             var currentColumn = startColumn
@@ -101,6 +105,28 @@ struct MapGenerator {
         }
 
         return edges
+    }
+
+    private func spacedStartColumns(in totalColumns: Int, rng: inout SeededRandomNumberGenerator) -> [Int] {
+        let targetCount = min(Config.startNodeCount, totalColumns)
+        let allColumns = Array(0..<totalColumns).shuffled(using: &rng)
+
+        var selected: [Int] = []
+        for column in allColumns {
+            if selected.count == targetCount { break }
+            if selected.allSatisfy({ abs($0 - column) >= Config.startNodeMinimumSpacing }) {
+                selected.append(column)
+            }
+        }
+
+        if selected.count < targetCount {
+            for column in allColumns where !selected.contains(column) {
+                if selected.count == targetCount { break }
+                selected.append(column)
+            }
+        }
+
+        return selected.sorted()
     }
 
     private func assignNodeTypes(
@@ -267,19 +293,12 @@ struct MapGenerator {
         edges[from, default: []].insert(to)
     }
 
-    private func uniqueRandomColumns(count: Int, in maxColumns: Int, rng: inout SeededRandomNumberGenerator) -> Set<Int> {
-        var result: Set<Int> = []
-        while result.count < count {
-            result.insert(Int.random(in: 0..<maxColumns, using: &rng))
-        }
-        return result
-    }
-
     private func branchProbability(for row: Int) -> Double {
         switch row {
-        case 0...2: return 0.4
-        case 3...8: return 0.28
-        default: return 0.2
+        case 0: return 0
+        case 1...3: return 0.2
+        case 4...8: return 0.26
+        default: return 0.18
         }
     }
 
