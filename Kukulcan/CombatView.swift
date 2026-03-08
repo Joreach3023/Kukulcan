@@ -103,6 +103,8 @@ struct CombatView: View {
     private let handVerticalDragDominanceRatio: CGFloat = 1.15
     private let enemyTurnStepDelay: TimeInterval = 1.4
     private var combatSceneHorizontalPadding: CGFloat { isCompactPortrait ? 12 : 10 }
+    private let combatRowSpacing: CGFloat = 10
+    private var combatContentWidth: CGFloat { (slotCardWidth * 4) + (combatRowSpacing * 3) }
 
     private var enemyAIConfiguration: EnemyAI.Configuration {
         switch aiLevel {
@@ -432,17 +434,21 @@ struct CombatView: View {
 
     private var opponentBoardArea: some View {
         VStack(spacing: 6) {
-            HStack(spacing: 8) {
+            HStack(spacing: combatRowSpacing) {
                 ForEach(engine.opponent.board.indices, id: \.self) { i in
                     let inst = engine.opponent.board[i]
                     slotView(for: inst?.base, hp: inst?.currentHP)
                 }
+
+                Color.clear
+                    .frame(width: slotCardWidth, height: slotCardHeight)
             }
+            .frame(width: combatContentWidth, alignment: .leading)
         }
     }
 
     private var opponentZonesRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: combatRowSpacing) {
             VStack(spacing: 6) {
                 ZStack {
                     if engine.opponent.deck.isEmpty {
@@ -501,6 +507,7 @@ struct CombatView: View {
                 }
             }
         }
+        .frame(width: combatContentWidth, alignment: .leading)
     }
 
     // MARK: - Board du joueur
@@ -511,7 +518,7 @@ struct CombatView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .foregroundStyle(.secondary)
-            HStack(spacing: 8) {
+            HStack(spacing: combatRowSpacing) {
                 ForEach(engine.current.board.indices, id: \.self) { i in
                     let inst = engine.current.board[i]
                     // Carte en jeu
@@ -549,7 +556,11 @@ struct CombatView: View {
                             )
                     }
                 }
+
+                Color.clear
+                    .frame(width: slotCardWidth, height: slotCardHeight)
             }
+            .frame(width: combatContentWidth, alignment: .leading)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 6)
@@ -559,7 +570,7 @@ struct CombatView: View {
 
     // MARK: - Zones spéciales (Dieu / Sacrifice / Défausse)
     private var zonesRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: combatRowSpacing) {
             VStack(spacing: 6) {
                 Text("Pioche")
                     .font(.caption)
@@ -661,7 +672,7 @@ struct CombatView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: combatContentWidth, alignment: .leading)
         .padding(.horizontal, 6)
         .padding(.vertical, 8)
         .background(.black.opacity(0.24), in: RoundedRectangle(cornerRadius: 14))
