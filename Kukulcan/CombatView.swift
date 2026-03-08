@@ -359,6 +359,8 @@ struct CombatView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(.orange)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
             .disabled(!isPlayerInteractionEnabled)
 
             Button("Quitter") {
@@ -378,6 +380,8 @@ struct CombatView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(engine.p1.name)
                     .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                     .foregroundColor(.white)
                 HStack(spacing: 10) {
                     HStack(spacing: 4) {
@@ -399,6 +403,8 @@ struct CombatView: View {
             VStack(alignment: .trailing, spacing: 4) {
                 Text(engine.p2.name)
                     .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                     .foregroundColor(.white)
                 HStack(spacing: 10) {
                     HStack(spacing: 4) {
@@ -504,7 +510,11 @@ struct CombatView: View {
     // MARK: - Board du joueur
     private var boardArea: some View {
         VStack(spacing: 6) {
-            Text("Tes unités").font(.caption).foregroundStyle(.secondary)
+            Text("Tes unités")
+                .font(.caption)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .foregroundStyle(.secondary)
             HStack(spacing: 8) {
                 ForEach(0..<3) { i in
                     let inst = engine.current.board[i]
@@ -552,7 +562,11 @@ struct CombatView: View {
     private var zonesRow: some View {
         HStack(spacing: 10) {
             VStack(spacing: 6) {
-                Text("Pioche").font(.caption).foregroundStyle(.secondary)
+                Text("Pioche")
+                    .font(.caption)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .foregroundStyle(.secondary)
                 ZStack {
                     if engine.current.deck.isEmpty {
                         emptySlot(width: deckCardWidth, height: deckCardHeight)
@@ -573,7 +587,11 @@ struct CombatView: View {
             }
 
             VStack(spacing: 6) {
-                Text("Ton dieu").font(.caption).foregroundStyle(.secondary)
+                Text("Ton dieu")
+                    .font(.caption)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .foregroundStyle(.secondary)
                 ZStack(alignment: .topTrailing) {
                     slotView(for: engine.current.godSlot?.base, hp: engine.current.godSlot?.currentHP)
                         .frame(width: slotCardWidth, height: slotCardHeight)
@@ -597,7 +615,11 @@ struct CombatView: View {
             }
 
             VStack(spacing: 6) {
-                Text("Sacrifice").font(.caption).foregroundStyle(.secondary)
+                Text("Sacrifice")
+                    .font(.caption)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .foregroundStyle(.secondary)
                 ZStack {
                     if let inst = engine.current.sacrificeSlot {
                         CardView(card: inst.base, faceUp: true, width: slotCardWidth) {
@@ -623,7 +645,11 @@ struct CombatView: View {
             }
 
             VStack(spacing: 6) {
-                Text("Défausse").font(.caption).foregroundStyle(.secondary)
+                Text("Défausse")
+                    .font(.caption)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .foregroundStyle(.secondary)
                 ZStack {
                     emptySlot(width: slotCardWidth, height: slotCardHeight)
                     if !engine.current.discard.isEmpty {
@@ -1163,15 +1189,12 @@ struct CombatView: View {
                     showAttackPicker = false
                 }
 
-                HStack(spacing: 8) {
-                    ForEach(0..<3) { i in
-                        Button("Lane \(i+1)") {
-                            if let from = attackFromSlot {
-                                engine.attack(from: from, to: .boardSlot(i))
-                            }
-                            showAttackPicker = false
-                        }
-                        .buttonStyle(.bordered)
+                ViewThatFits {
+                    HStack(spacing: 8) {
+                        laneAttackButtons
+                    }
+                    VStack(spacing: 8) {
+                        laneAttackButtons
                     }
                 }
 
@@ -1181,6 +1204,22 @@ struct CombatView: View {
                 .padding(.top, 6)
             }
             .padding()
+        }
+    }
+}
+
+private extension CombatView {
+    var laneAttackButtons: some View {
+        ForEach(0..<3) { i in
+            Button("Lane \(i + 1)") {
+                if let from = attackFromSlot {
+                    engine.attack(from: from, to: .boardSlot(i))
+                }
+                showAttackPicker = false
+            }
+            .buttonStyle(.bordered)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
         }
     }
 }
