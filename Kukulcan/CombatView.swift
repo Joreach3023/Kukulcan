@@ -86,14 +86,19 @@ struct CombatView: View {
     @State private var sacrificeFrame: CGRect = .zero
     @State private var hoveringSacrifice = false
 
-    // Tailles réduites pour mieux voir l’ensemble du plateau
-    private let slotCardWidth: CGFloat = 60
-    private let slotCardHeight: CGFloat = 84
-    private let deckCardWidth: CGFloat = 60
-    private let deckCardHeight: CGFloat = 84
-    private let handCardWidth: CGFloat = 90
+    // Tailles adaptatives pour une hiérarchie plus claire sur mobile portrait
+    private var isCompactPortrait: Bool {
+        let screen = UIScreen.main.bounds
+        return screen.height > screen.width
+    }
+
+    private var slotCardWidth: CGFloat { isCompactPortrait ? 70 : 64 }
+    private var slotCardHeight: CGFloat { slotCardWidth * 1.4 }
+    private var deckCardWidth: CGFloat { slotCardWidth }
+    private var deckCardHeight: CGFloat { slotCardHeight }
+    private var handCardWidth: CGFloat { isCompactPortrait ? 104 : 92 }
     private var handCardHeight: CGFloat { handCardWidth * 1.4 }
-    private let handCardSpacing: CGFloat = -22
+    private var handCardSpacing: CGFloat { isCompactPortrait ? -16 : -20 }
     private let handVerticalDragThreshold: CGFloat = 34
     private let handVerticalDragDominanceRatio: CGFloat = 1.15
     private let enemyTurnStepDelay: TimeInterval = 1.4
@@ -192,18 +197,18 @@ struct CombatView: View {
     }
 
     var body: some View {
-        GeometryReader { _ in
+        GeometryReader { geometry in
             ZStack {
                 // Fond visuel du combat
                 CombatBackground()
 
-                VStack(spacing: 10) {
+                VStack(spacing: 8) {
                     header
 
                     // Plateau adverse miroité
                     opponentBoard
 
-                    Divider().opacity(0.3)
+                    Spacer(minLength: 2)
 
                     // Board du joueur (3 slots)
                     boardArea
@@ -215,7 +220,7 @@ struct CombatView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
-                .padding(.bottom, handCardHeight + 20)
+                .padding(.bottom, handCardHeight + max(20, geometry.safeAreaInsets.bottom + 12))
 
                 if showBloodRiver {
                     BloodRiverView()
@@ -311,7 +316,9 @@ struct CombatView: View {
         .safeAreaInset(edge: .bottom) {
             handStrip
                 .padding(.horizontal, 12)
-                .padding(.bottom, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 10)
+                .background(.ultraThinMaterial)
                 .allowsHitTesting(isPlayerInteractionEnabled)
                 .opacity(isPlayerInteractionEnabled ? 1 : 0.7)
         }
@@ -373,6 +380,8 @@ struct CombatView: View {
             .tint(.red)
         }
         .font(.caption.bold())
+        .padding(10)
+        .background(.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
         .padding(.trailing, 10)
         .padding(.top, 8)
     }
@@ -426,6 +435,9 @@ struct CombatView: View {
                 .font(.subheadline)
             }
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 14))
     }
 
     // MARK: - Plateau adverse (miroir vertical)
@@ -559,6 +571,9 @@ struct CombatView: View {
             }
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 8)
+        .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 14))
     }
 
     // MARK: - Zones spéciales (Dieu / Sacrifice / Défausse)
@@ -664,9 +679,11 @@ struct CombatView: View {
                     }
                 }
             }
-            Spacer()
         }
         .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 8)
+        .background(.black.opacity(0.24), in: RoundedRectangle(cornerRadius: 14))
     }
 
     // MARK: - Main du joueur
