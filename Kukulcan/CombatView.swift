@@ -78,6 +78,8 @@ struct CombatView: View {
 
     // Drag & drop depuis la main vers le board
     @State private var draggingCardIndex: Int? = nil
+    @State private var activeHandGestureIndex: Int? = nil
+    @State private var hoveredHandCardID: UUID? = nil
     @State private var dragPosition: CGPoint = .zero
     @State private var hoveredSlot: Int? = nil
     @State private var slotFrames: [Int: CGRect] = [:]
@@ -91,6 +93,9 @@ struct CombatView: View {
     private let deckCardHeight: CGFloat = 84
     private let handCardWidth: CGFloat = 90
     private var handCardHeight: CGFloat { handCardWidth * 1.4 }
+    private let handCardSpacing: CGFloat = -22
+    private let handVerticalDragThreshold: CGFloat = 34
+    private let handVerticalDragDominanceRatio: CGFloat = 1.15
     private let enemyTurnStepDelay: TimeInterval = 1.4
 
     private var isPlayerInteractionEnabled: Bool {
@@ -525,28 +530,57 @@ struct CombatView: View {
     // MARK: - Main du joueur
     private var handStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
+            HStack(spacing: handCardSpacing) {
                 ForEach(engine.current.hand.indices, id: \.self) { idx in
                     let c = engine.current.hand[idx]
+                    let isHovered = hoveredHandCardID == c.id
+                    let isDragging = draggingCardIndex == idx
                     CardView(card: c, faceUp: true, width: handCardWidth) {
+                        hoveredHandCardID = c.id
                         selectedCard = c
                     }
                     .rotation3DEffect(.degrees(12), axis: (x: 1, y: 0, z: 0))
-                    .opacity(((openingHandCardIDs.contains(c.id) && !displayedHandCardIDs.contains(c.id)) || hiddenHandCardIDs.contains(c.id) || draggingCardIndex == idx) ? 0 : 1)
+                    .scaleEffect(isHovered ? 1.08 : 1.0)
+                    .brightness(isHovered ? 0.08 : 0)
+                    .shadow(color: .yellow.opacity(isHovered ? 0.35 : 0), radius: isHovered ? 12 : 0, x: 0, y: isHovered ? 6 : 0)
+                    .zIndex(isDragging ? 400 : (isHovered ? 300 : Double(idx)))
+                    .opacity(((openingHandCardIDs.contains(c.id) && !displayedHandCardIDs.contains(c.id)) || hiddenHandCardIDs.contains(c.id) || isDragging) ? 0 : 1)
                     .allowsHitTesting(!openingHandCardIDs.contains(c.id) || displayedHandCardIDs.contains(c.id))
                     .background(
                         GeometryReader { geo in
                             Color.clear.preference(key: HandCardFramePreferenceKey.self, value: [c.id: geo.frame(in: .named("combatArea"))])
                         }
                     )
+                    .animation(.spring(response: 0.22, dampingFraction: 0.82), value: isHovered)
                     .gesture(
                         DragGesture(minimumDistance: 0, coordinateSpace: .named("combatArea"))
                             .onChanged { value in
                                 guard isPlayerInteractionEnabled else { return }
-                                dragPosition = value.location
-                                if draggingCardIndex == nil {
-                                    draggingCardIndex = idx
+                                if activeHandGestureIndex == nil {
+                                    activeHandGestureIndex = idx
                                 }
+                                guard activeHandGestureIndex == idx else { return }
+
+                                hoveredHandCardID = handCardID(at: value.location)
+
+                                if draggingCardIndex == nil {
+                                    let upwardDistance = -value.translation.height
+                                    let horizontalDistance = abs(value.translation.width)
+                                    let isMostlyVerticalForward = upwardDistance > handVerticalDragThreshold
+                                        && upwardDistance > horizontalDistance * handVerticalDragDominanceRatio
+
+                                    guard isMostlyVerticalForward else {
+                                        hoveredSlot = nil
+                                        hoveringSacrifice = false
+                                        return
+                                    }
+
+                                    draggingCardIndex = idx
+                                    hoveredHandCardID = nil
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                }
+
+                                dragPosition = value.location
                                 if let slot = slotFrames.first(where: { $0.value.contains(value.location) })?.key {
                                     if hoveredSlot != slot {
                                         hoveredSlot = slot
@@ -565,20 +599,26 @@ struct CombatView: View {
                                 }
                             }
                             .onEnded { _ in
-                                guard isPlayerInteractionEnabled else {
+                                guard activeHandGestureIndex == idx else { return }
+                                defer {
+                                    activeHandGestureIndex = nil
                                     draggingCardIndex = nil
                                     hoveredSlot = nil
                                     hoveringSacrifice = false
+                                    hoveredHandCardID = nil
+                                }
+
+                                guard isPlayerInteractionEnabled else {
                                     return
                                 }
+
+                                guard draggingCardIndex == idx else { return }
+
                                 if let slot = hoveredSlot {
                                     engine.playCommonToBoard(handIndex: idx, slot: slot)
                                 } else if hoveringSacrifice {
                                     engine.sacrificeCommon(handIndex: idx)
                                 }
-                                draggingCardIndex = nil
-                                hoveredSlot = nil
-                                hoveringSacrifice = false
                             }
                     )
                     .overlay(alignment: .bottom) {
@@ -593,6 +633,14 @@ struct CombatView: View {
             handCardFrames.merge(frames) { _, new in new }
             processPendingDrawAnimations()
         }
+    }
+
+    private func handCardID(at location: CGPoint) -> UUID? {
+        let matching = engine.current.hand
+            .enumerated()
+            .filter { handCardFrames[$0.element.id]?.contains(location) == true }
+
+        return matching.max(by: { $0.offset < $1.offset })?.element.id
     }
 
     // Boutons d’actions sur une carte en main
