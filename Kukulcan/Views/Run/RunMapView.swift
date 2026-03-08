@@ -433,7 +433,7 @@ private struct ShopChoiceSheet: View {
         GeometryReader { geo in
             let size = geo.size
             ZStack {
-                Image("assets/shop/shop_background")
+                Image("shop_background")
                     .resizable()
                     .scaledToFill()
                     .frame(width: size.width, height: size.height)
@@ -447,22 +447,22 @@ private struct ShopChoiceSheet: View {
                     .clipped()
 
                 HStack {
-                    SpriteSheetAnimationView(imageName: "assets/shop/torch_fire_sprite", frameCount: 4, fps: 9)
+                    SpriteSheetAnimationView(imageName: "torch_fire_sprite", frameCount: 4, fps: 9)
                         .frame(width: size.width * 0.2, height: size.height * 0.22)
                     Spacer()
-                    SpriteSheetAnimationView(imageName: "assets/shop/torch_fire_sprite", frameCount: 4, fps: 9)
+                    SpriteSheetAnimationView(imageName: "torch_fire_sprite", frameCount: 4, fps: 9)
                         .frame(width: size.width * 0.2, height: size.height * 0.22)
                         .scaleEffect(x: -1, y: 1)
                 }
                 .padding(.horizontal, 8)
                 .offset(y: -size.height * 0.22)
 
-                SpriteSheetAnimationView(imageName: "assets/shop/shop_incense_smoke", frameCount: 3, fps: 4)
+                SpriteSheetAnimationView(imageName: "shop_incense_smoke", frameCount: 3, fps: 4)
                     .frame(width: size.width * 0.6, height: size.height * 0.26)
                     .opacity(0.35)
                     .offset(y: -size.height * 0.16)
 
-                Image("assets/shop/merchant_maya")
+                Image("merchant_maya")
                     .resizable()
                     .scaledToFit()
                     .frame(width: size.width * 0.66)
@@ -506,7 +506,7 @@ private struct ShopChoiceSheet: View {
     private func relicOffers(size: CGSize) -> some View {
         let offers = interaction.relicOffers
         return ZStack(alignment: .bottom) {
-            Image("assets/shop/shop_pedestal_slots")
+            Image("shop_pedestal_slots")
                 .resizable()
                 .scaledToFit()
                 .frame(width: min(size.width * 0.95, 520))
@@ -530,7 +530,7 @@ private struct ShopChoiceSheet: View {
 
         return VStack(spacing: 6) {
             ZStack {
-                SpriteSheetAnimationView(imageName: "assets/shop/relic_glow_animation", frameCount: 2, fps: 2)
+                SpriteSheetAnimationView(imageName: "relic_glow_animation", frameCount: 2, fps: 2)
                     .frame(width: 70, height: 70)
                     .opacity(offer.isPurchased ? 0 : 0.7)
 
