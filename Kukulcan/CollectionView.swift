@@ -83,7 +83,7 @@ struct CollectionView: View {
         .fullScreenCover(item: $selectedCard) { card in
             CardDetailView(card: card) { selectedCard = nil }
         }
-        .onAppear { AudioManager.shared.play(.collection) }
+        .onAppear { AudioManager.shared.transitionToMusic(named: AudioManager.Track.collection.rawValue) }
     }
 
 
