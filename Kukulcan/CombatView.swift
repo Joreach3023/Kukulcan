@@ -102,6 +102,74 @@ struct CombatView: View {
         turnPhase == .playerTurn && outcome == nil
     }
 
+    private var hasAvailablePlayerAction: Bool {
+        let player = engine.current
+
+        let hasReadyAttacker = player.board.contains { $0?.hasActedThisTurn == false }
+            || player.godSlot?.hasActedThisTurn == false
+
+        if hasReadyAttacker {
+            return true
+        }
+
+        for card in player.hand {
+            switch card.type {
+            case .common:
+                return true // au minimum: sacrifice
+            case .ritual:
+                return true
+            case .god:
+                if player.godSlot == nil && player.blood >= card.bloodCost {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    private var playerActionStateSignature: String {
+        let player = engine.current
+        let handState = player.hand
+            .map { "\($0.id.uuidString)-\($0.type.rawValue)-\($0.bloodCost)" }
+            .joined(separator: "|")
+        let boardState = player.board
+            .map { inst in
+                guard let inst else { return "empty" }
+                return "\(inst.base.id.uuidString)-\(inst.hasActedThisTurn)-\(inst.currentHP)"
+            }
+            .joined(separator: "|")
+        let godState: String
+        if let god = player.godSlot {
+            godState = "\(god.base.id.uuidString)-\(god.hasActedThisTurn)-\(god.currentHP)"
+        } else {
+            godState = "none"
+        }
+
+        return [
+            String(turnPhaseHash),
+            String(engine.currentPlayerIsP1),
+            String(outcome != nil),
+            String(player.blood),
+            handState,
+            boardState,
+            godState
+        ].joined(separator: "#")
+    }
+
+    private var turnPhaseHash: Int {
+        switch turnPhase {
+        case .playerTurn: return 0
+        case .playerEnding: return 1
+        case .enemyTurn: return 2
+        case .enemyDrawing: return 3
+        case .enemyPlaying: return 4
+        case .enemyResolving: return 5
+        case .enemyEnding: return 6
+        case .playerDrawing: return 7
+        }
+    }
+
     var body: some View {
         GeometryReader { _ in
             ZStack {
@@ -204,6 +272,9 @@ struct CombatView: View {
                 showBloodRiver = false
             }
         }
+        .onChange(of: playerActionStateSignature) { _ in
+            maybeAutoEndPlayerTurn()
+        }
         .sheet(isPresented: $showTargetPickerForRitual) {
             ritualTargetSheet
                 .presentationDetents([.height(280)])
@@ -228,10 +299,13 @@ struct CombatView: View {
                     endPlayerTurnAndRunEnemySequence()
                 }
                 .disabled(!isPlayerInteractionEnabled)
-                Button("Fin de partie") {
-                    dismiss()
+                Button("Quitter") {
+                    quitCombat()
                 }
             }
+        }
+        .overlay(alignment: .topTrailing) {
+            combatControlsOverlay
         }
         .fullScreenCover(item: $selectedCard) { card in
             CardDetailView(card: card) { selectedCard = nil }
@@ -257,6 +331,26 @@ struct CombatView: View {
                 }
             }
         }
+    }
+
+    private var combatControlsOverlay: some View {
+        VStack(spacing: 8) {
+            Button("Fin du tour") {
+                endPlayerTurnAndRunEnemySequence()
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.orange)
+            .disabled(!isPlayerInteractionEnabled)
+
+            Button("Quitter") {
+                quitCombat()
+            }
+            .buttonStyle(.bordered)
+            .tint(.red)
+        }
+        .font(.caption.bold())
+        .padding(.trailing, 10)
+        .padding(.top, 8)
     }
 
     // MARK: - Header (scores / sang)
@@ -735,6 +829,16 @@ struct CombatView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + enemyTurnStepDelay) {
             runEnemyTurnSequence()
         }
+    }
+
+    private func maybeAutoEndPlayerTurn() {
+        guard isPlayerInteractionEnabled, !hasAvailablePlayerAction else { return }
+        endPlayerTurnAndRunEnemySequence()
+    }
+
+    private func quitCombat() {
+        onLoss?()
+        dismiss()
     }
 
     private func runEnemyTurnSequence() {
