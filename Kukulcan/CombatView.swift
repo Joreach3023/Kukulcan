@@ -764,12 +764,11 @@ struct CombatView: View {
 
     // MARK: - Main du joueur
     private var handStrip: some View {
-        GeometryReader { geo in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack {
-                    Spacer(minLength: 0)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack {
+                Spacer(minLength: 0)
 
-                    HStack(spacing: handCardSpacing) {
+                HStack(spacing: handCardSpacing) {
                     ForEach(playerState.hand.indices, id: \.self) { idx in
                         let c = playerState.hand[idx]
                         let isHovered = hoveredHandCardID == c.id
@@ -865,12 +864,11 @@ struct CombatView: View {
                                 .padding(.bottom, 6)
                         }
                     }
-                    }
-                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 4)
-                .frame(minWidth: geo.size.width)
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 4)
+            .frame(maxWidth: .infinity)
         }
         .frame(minHeight: handCardHeight + 34, alignment: .center)
         .onPreferenceChange(HandCardFramePreferenceKey.self) { frames in
