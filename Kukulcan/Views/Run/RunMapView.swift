@@ -343,8 +343,19 @@ private struct ShopChoiceSheet: View {
 
                 Divider()
 
-                Button("Acheter relique: \(interaction.relic.name) (\(interaction.relicCost) or)") {
+                Button {
                     onBuyRelic()
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Acheter relique: \(interaction.relic.name) (\(interaction.relicCost) or)")
+                            .font(.headline)
+                        Text(interaction.relic.effect)
+                            .font(.subheadline)
+                        Text("Rareté: \(interaction.relic.rarity.title)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled((player?.gold ?? 0) < interaction.relicCost)

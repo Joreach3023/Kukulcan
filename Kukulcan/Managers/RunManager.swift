@@ -40,6 +40,7 @@ final class RunManager: ObservableObject {
     private let normalEnemies: [Card] = Array(CardsDB.commons.prefix(3))
     private let eliteEnemies: [Card] = Array(CardsDB.gods.filter { $0.name != "Kukulcan" }.prefix(3))
     private let bossEnemy: Card = CardsDB.gods.first(where: { $0.name == "Kukulcan" }) ?? CardsDB.gods[0]
+    private var codexBoostNextReward = false
 
     func startNewRun() {
         let starterCards = Array((CardsDB.commons.prefix(6) + CardsDB.rituals.prefix(2)).shuffled())
@@ -57,6 +58,7 @@ final class RunManager: ObservableObject {
         pendingCampfire = nil
         pendingShop = nil
         pendingEvent = nil
+        codexBoostNextReward = false
     }
 
     func selectNode(_ node: MapNode) {
@@ -80,7 +82,7 @@ final class RunManager: ObservableObject {
             let healAmount = max(1, Int(Double(state.player.maxHP) * 0.3))
             pendingCampfire = CampfireInteraction(nodeID: node.id, healAmount: healAmount)
         case .shop:
-            let cardCostModifier = hasRelic(named: "Totem d'obsidienne", in: state.player) ? 15 : 0
+            let cardCostModifier = hasRelic(.obsidianOffering, in: state.player) ? 15 : 0
             pendingShop = ShopInteraction(
                 nodeID: node.id,
                 cardOffers: randomShopCards(),
@@ -185,6 +187,10 @@ final class RunManager: ObservableObject {
             }
         }
 
+        if hasRelic(.sacredCodex, in: state.player) {
+            codexBoostNextReward = true
+        }
+
         if state.player.currentHP <= 0 {
             state.status = .gameOver
             runState = state
@@ -232,11 +238,11 @@ final class RunManager: ObservableObject {
         if let node = state.nodes.first(where: { $0.id == nodeID }) {
             state.currentNodeID = nodeID
             let baseGold = node.type == .boss ? 100 : 25
-            let relicGoldBonus = hasRelic(named: "Idole solaire", in: state.player) ? 1 : 0
+            let relicGoldBonus = hasRelic(.obsidianOffering, in: state.player) ? 2 : 0
             state.player.gold += baseGold + relicGoldBonus
 
             if node.type == .elite,
-               hasRelic(named: "Plume de Kukulcan", in: state.player) {
+               hasRelic(.quetzalFeather, in: state.player) {
                 state.player.currentHP = min(state.player.maxHP, state.player.currentHP + 2)
             }
 
@@ -252,7 +258,8 @@ final class RunManager: ObservableObject {
         activeBattle = nil
         state.status = .choosingReward
         runState = state
-        pendingRewards = buildCombatRewards(for: state.player)
+        pendingRewards = buildCombatRewards(for: state.player, includeBonusCard: codexBoostNextReward)
+        codexBoostNextReward = false
     }
 
     func chooseReward(_ reward: Reward) {
@@ -280,6 +287,7 @@ final class RunManager: ObservableObject {
         pendingCampfire = nil
         pendingShop = nil
         pendingEvent = nil
+        codexBoostNextReward = false
         runState = state
     }
 
@@ -309,7 +317,7 @@ final class RunManager: ObservableObject {
     }
 
     private func randomRelic() -> Relic {
-        MayaRelicPool.all.randomElement() ?? Relic(name: "Amulette de jade", effectDescription: "+1 pioche au début du combat")
+        MayaRelicPool.all.randomElement() ?? MayaRelicPool.all[0]
     }
 
     private func randomCard(rarity: Rarity?) -> Card? {
@@ -343,29 +351,19 @@ final class RunManager: ObservableObject {
         )
     }
 
-    private func buildCombatRewards(for player: PlayerRunState) -> [Reward] {
+    private func buildCombatRewards(for player: PlayerRunState, includeBonusCard: Bool = false) -> [Reward] {
+        _ = player
         let basePool = CardsDB.commons + CardsDB.rituals
-        let rareBoost: [Card]
-        if hasRelic(named: "Masque rituel", in: player) {
-            rareBoost = Array(repeating: CardsDB.gods, count: 2).flatMap { $0 }
-        } else {
-            rareBoost = []
-        }
-
-        let offeredCards = Array((basePool + rareBoost).shuffled().prefix(2))
+        let cardCount = includeBonusCard ? 3 : 2
+        let offeredCards = Array(basePool.shuffled().prefix(cardCount))
         return offeredCards.map(Reward.card) + [.gold(20)]
     }
 
     private func grantRelic(_ relic: Relic, to player: inout PlayerRunState) {
         player.relics.append(relic)
-
-        if relic.name == "Bassin lunaire" {
-            player.maxHP += 5
-            player.currentHP += 5
-        }
     }
 
-    private func hasRelic(named relicName: String, in player: PlayerRunState) -> Bool {
-        player.relics.contains(where: { $0.name == relicName })
+    private func hasRelic(_ relicID: RelicID, in player: PlayerRunState) -> Bool {
+        player.relics.contains(where: { $0.relicID == relicID })
     }
 }
