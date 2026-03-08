@@ -225,4 +225,49 @@ struct KukulcanTests {
         #expect(action?.card.id == common.id)
     }
 
+    /// Le joueur qui commence ne peut pas attaquer pendant son premier tour.
+    @Test func firstPlayerCannotAttackOnFirstTurn() {
+        let fighter = Card(name: "Guerrier", type: .common, rarity: .common,
+                           imageName: "", attack: 2, health: 2, effect: "")
+        var p1 = PlayerState(name: "P1")
+        let p2 = PlayerState(name: "P2")
+        p1.board[0] = CardInstance(fighter)
+
+        let engine = GameEngine(p1: p1, p2: p2)
+        engine.attack(from: 0, to: .player)
+
+        #expect(engine.p2.hp == 10)
+    }
+
+    /// Le joueur qui ne commence pas peut attaquer normalement à son premier tour.
+    @Test func secondPlayerCanAttackOnTheirFirstTurn() {
+        let fighter = Card(name: "Guerrier", type: .common, rarity: .common,
+                           imageName: "", attack: 2, health: 2, effect: "")
+        let p1 = PlayerState(name: "P1")
+        var p2 = PlayerState(name: "P2")
+        p2.board[0] = CardInstance(fighter)
+
+        let engine = GameEngine(p1: p1, p2: p2)
+        engine.endTurn() // fin du premier tour du joueur qui commence
+        engine.attack(from: 0, to: .player)
+
+        #expect(engine.p1.hp == 8)
+    }
+
+    /// Le setup de partie pose automatiquement des communes pour les deux joueurs.
+    @Test func startAutoDeploysOpeningCommonsForBothPlayers() {
+        let common = Card(name: "Soldat", type: .common, rarity: .common,
+                          imageName: "", attack: 1, health: 1, effect: "")
+        var p1 = PlayerState(name: "P1")
+        var p2 = PlayerState(name: "P2")
+        p1.deck = Array(repeating: common, count: 10)
+        p2.deck = Array(repeating: common, count: 10)
+
+        let engine = GameEngine(p1: p1, p2: p2)
+        engine.start(mulligan: 5)
+
+        #expect(engine.p1.board.compactMap { $0 }.count == 3)
+        #expect(engine.p2.board.compactMap { $0 }.count == 3)
+    }
+
 }

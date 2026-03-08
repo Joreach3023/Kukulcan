@@ -124,8 +124,10 @@ struct CombatView: View {
     private var hasAvailablePlayerAction: Bool {
         let player = engine.current
 
-        let hasReadyAttacker = player.board.contains { $0?.hasActedThisTurn == false }
+        let hasReadyAttacker = engine.canCurrentPlayerAttack && (
+            player.board.contains { $0?.hasActedThisTurn == false }
             || player.godSlot?.hasActedThisTurn == false
+        )
 
         if hasReadyAttacker {
             return true
@@ -273,6 +275,7 @@ struct CombatView: View {
                 engine.start()
             }
             queueOpeningHandAnimationIfNeeded()
+            configureInitialTurnFlowIfNeeded()
             AudioManager.shared.transitionToMusic(named: AudioManager.Track.combat.rawValue)
         }
         .onDisappear {
@@ -544,8 +547,8 @@ struct CombatView: View {
                                                 .background(Circle().fill(.orange))
                                                 .foregroundStyle(.white)
                                         }
-                                        .disabled(inst?.hasActedThisTurn != false)
-                                        .opacity(inst?.hasActedThisTurn == true ? 0.45 : 1)
+                                        .disabled(inst?.hasActedThisTurn != false || !engine.canCurrentPlayerAttack)
+                                        .opacity((inst?.hasActedThisTurn == true || !engine.canCurrentPlayerAttack) ? 0.45 : 1)
                                     }
                                 }
                                 .padding(6)
@@ -607,8 +610,8 @@ struct CombatView: View {
                                 .background(Circle().fill(.orange))
                                 .foregroundStyle(.white)
                         }
-                        .disabled(engine.current.godSlot?.hasActedThisTurn != false)
-                        .opacity(engine.current.godSlot?.hasActedThisTurn == true ? 0.45 : 1)
+                        .disabled(engine.current.godSlot?.hasActedThisTurn != false || !engine.canCurrentPlayerAttack)
+                        .opacity((engine.current.godSlot?.hasActedThisTurn == true || !engine.canCurrentPlayerAttack) ? 0.45 : 1)
                         .padding(6)
                     }
                 }
@@ -906,6 +909,21 @@ struct CombatView: View {
                     runEnemyEndStep()
                 }
             }
+        }
+    }
+
+    private func configureInitialTurnFlowIfNeeded() {
+        guard turnPhase == .playerTurn else { return }
+
+        if engine.currentPlayerIsP1 {
+            showTurnBanner("Player Turn")
+            return
+        }
+
+        showTurnBanner("Enemy Turn")
+        turnPhase = .enemyTurn
+        DispatchQueue.main.asyncAfter(deadline: .now() + enemyTurnStepDelay) {
+            runEnemyTurnSequence()
         }
     }
 
