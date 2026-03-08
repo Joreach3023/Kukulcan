@@ -125,6 +125,14 @@ struct CombatView: View {
         EnemyAI(configuration: enemyAIConfiguration)
     }
 
+    private var playerState: PlayerState {
+        engine.p1
+    }
+
+    private var enemyState: PlayerState {
+        engine.p2
+    }
+
     private var isPlayerInteractionEnabled: Bool {
         turnPhase == .playerTurn && outcome == nil
     }
@@ -240,7 +248,7 @@ struct CombatView: View {
                 }
 
                 if let idx = draggingCardIndex {
-                    CardView(card: engine.current.hand[idx], faceUp: true, width: handCardWidth)
+                    CardView(card: playerState.hand[idx], faceUp: true, width: handCardWidth)
                         .position(dragPosition)
                         .shadow(radius: 8)
                         .zIndex(1)
@@ -301,8 +309,8 @@ struct CombatView: View {
             guard engine.currentPlayerIsP1, !cards.isEmpty else { return }
             enqueueDrawAnimation(cards)
         }
-        .onChange(of: engine.current.sacrificeSlot?.id) {
-            guard engine.current.sacrificeSlot != nil else { return }
+        .onChange(of: engine.p1.sacrificeSlot?.id) {
+            guard engine.p1.sacrificeSlot != nil else { return }
             let generator = UIImpactFeedbackGenerator(style: .heavy)
             generator.impactOccurred()
             showBloodRiver = true
@@ -440,8 +448,8 @@ struct CombatView: View {
                 Color.clear
                     .frame(width: slotCardWidth, height: slotCardHeight)
 
-                ForEach(engine.opponent.board.indices, id: \.self) { i in
-                    let inst = engine.opponent.board[i]
+                ForEach(enemyState.board.indices, id: \.self) { i in
+                    let inst = enemyState.board[i]
                     slotView(for: inst?.base, hp: inst?.currentHP)
                 }
             }
@@ -453,11 +461,11 @@ struct CombatView: View {
         HStack(spacing: combatRowSpacing) {
             VStack(spacing: 6) {
                 ZStack {
-                    if engine.opponent.deck.isEmpty {
+                    if enemyState.deck.isEmpty {
                         emptySlot(width: deckCardWidth, height: deckCardHeight)
                     } else {
                         CardBackView(width: deckCardWidth).frame(width: deckCardWidth, height: deckCardHeight)
-                        Text("\(engine.opponent.deck.count)")
+                        Text("\(enemyState.deck.count)")
                             .font(.headline.bold())
                             .foregroundStyle(.white)
                             .rotationEffect(.degrees(180))
@@ -477,31 +485,39 @@ struct CombatView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .rotationEffect(.degrees(180))
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.white.opacity(0.16))
-                    .frame(width: deckCardWidth + 8, height: deckCardHeight + 8)
-                    .overlay(
-                        Text("\(engine.opponent.hand.count)")
-                            .font(.caption.bold())
-                            .foregroundStyle(.white)
-                            .rotationEffect(.degrees(180))
-                    )
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear
-                                .onAppear { enemyHandFrame = geo.frame(in: .named("combatArea")) }
-                                .onChange(of: geo.frame(in: .named("combatArea"))) { _, frame in enemyHandFrame = frame }
+                ZStack(alignment: .topTrailing) {
+                    HStack(spacing: -deckCardWidth * 0.48) {
+                        ForEach(0..<min(enemyState.hand.count, 6), id: \.self) { _ in
+                            CardBackView(width: deckCardWidth * 0.84)
+                                .frame(width: deckCardWidth * 0.84, height: deckCardHeight * 0.84)
                         }
-                    )
+                    }
+                    .frame(width: deckCardWidth + 26, height: deckCardHeight + 8)
+
+                    Text("\(enemyState.hand.count)")
+                        .font(.caption.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(.black.opacity(0.72), in: Capsule())
+                        .rotationEffect(.degrees(180))
+                }
+                .background(
+                    GeometryReader { geo in
+                        Color.clear
+                            .onAppear { enemyHandFrame = geo.frame(in: .named("combatArea")) }
+                            .onChange(of: geo.frame(in: .named("combatArea"))) { _, frame in enemyHandFrame = frame }
+                    }
+                )
             }
 
             VStack(spacing: 6) {
-                slotView(for: engine.opponent.godSlot?.base, hp: engine.opponent.godSlot?.currentHP)
+                slotView(for: enemyState.godSlot?.base, hp: enemyState.godSlot?.currentHP)
                     .frame(width: slotCardWidth, height: slotCardHeight)
             }
 
             VStack(spacing: 6) {
-                if let inst = engine.opponent.sacrificeSlot {
+                if let inst = enemyState.sacrificeSlot {
                     CardView(card: inst.base, faceUp: true, width: slotCardWidth)
                         .rotationEffect(.degrees(180))
                 } else {
@@ -521,8 +537,8 @@ struct CombatView: View {
                 .minimumScaleFactor(0.75)
                 .foregroundStyle(.secondary)
             HStack(spacing: combatRowSpacing) {
-                ForEach(engine.current.board.indices, id: \.self) { i in
-                    let inst = engine.current.board[i]
+                ForEach(playerState.board.indices, id: \.self) { i in
+                    let inst = playerState.board[i]
                     // Carte en jeu
                     ZStack(alignment: .topTrailing) {
                         slotView(for: inst?.base, hp: inst?.currentHP)
@@ -580,11 +596,11 @@ struct CombatView: View {
                     .minimumScaleFactor(0.75)
                     .foregroundStyle(.secondary)
                 ZStack {
-                    if engine.current.deck.isEmpty {
+                    if playerState.deck.isEmpty {
                         emptySlot(width: deckCardWidth, height: deckCardHeight)
                     } else {
                         CardBackView(width: deckCardWidth).frame(width: deckCardWidth, height: deckCardHeight)
-                        Text("\(engine.current.deck.count)")
+                        Text("\(playerState.deck.count)")
                             .font(.headline.bold())
                             .foregroundStyle(.white)
                     }
@@ -605,9 +621,9 @@ struct CombatView: View {
                     .minimumScaleFactor(0.75)
                     .foregroundStyle(.secondary)
                 ZStack(alignment: .topTrailing) {
-                    slotView(for: engine.current.godSlot?.base, hp: engine.current.godSlot?.currentHP)
+                    slotView(for: playerState.godSlot?.base, hp: playerState.godSlot?.currentHP)
                         .frame(width: slotCardWidth, height: slotCardHeight)
-                    if engine.current.godSlot != nil {
+                    if playerState.godSlot != nil {
                         Button {
                             guard isPlayerInteractionEnabled else { return }
                             attackFromSlot = -1
@@ -619,8 +635,8 @@ struct CombatView: View {
                                 .background(Circle().fill(.orange))
                                 .foregroundStyle(.white)
                         }
-                        .disabled(engine.current.godSlot?.hasActedThisTurn != false || !canCurrentPlayerAttack)
-                        .opacity((engine.current.godSlot?.hasActedThisTurn == true || !canCurrentPlayerAttack) ? 0.45 : 1)
+                        .disabled(playerState.godSlot?.hasActedThisTurn != false || !canCurrentPlayerAttack)
+                        .opacity((playerState.godSlot?.hasActedThisTurn == true || !canCurrentPlayerAttack) ? 0.45 : 1)
                         .padding(6)
                     }
                 }
@@ -633,10 +649,10 @@ struct CombatView: View {
                     .minimumScaleFactor(0.75)
                     .foregroundStyle(.secondary)
                 ZStack {
-                    if let inst = engine.current.sacrificeSlot {
-                        CardView(card: inst.base, faceUp: true, width: slotCardWidth) {
-                            selectedCard = inst.base
-                        }
+                if let inst = playerState.sacrificeSlot {
+                    CardView(card: inst.base, faceUp: true, width: slotCardWidth) {
+                        selectedCard = inst.base
+                    }
                         .rotationEffect(.degrees(180))
                         .overlay(Text("+1 Sang").font(.caption2.bold()).padding(4).background(.black.opacity(0.6)).clipShape(Capsule()).foregroundStyle(.white), alignment: .bottom)
                     } else {
@@ -664,8 +680,8 @@ struct CombatView: View {
                     .foregroundStyle(.secondary)
                 ZStack {
                     emptySlot(width: slotCardWidth, height: slotCardHeight)
-                    if !engine.current.discard.isEmpty {
-                        Text("\(engine.current.discard.count)")
+                    if !playerState.discard.isEmpty {
+                        Text("\(playerState.discard.count)")
                             .font(.headline.bold())
                             .padding(8)
                             .background(Circle().fill(.black.opacity(0.6)))
@@ -684,8 +700,8 @@ struct CombatView: View {
     private var handStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: handCardSpacing) {
-                ForEach(engine.current.hand.indices, id: \.self) { idx in
-                    let c = engine.current.hand[idx]
+                ForEach(playerState.hand.indices, id: \.self) { idx in
+                    let c = playerState.hand[idx]
                     let isHovered = hoveredHandCardID == c.id
                     let isDragging = draggingCardIndex == idx
                     CardView(card: c, faceUp: true, width: handCardWidth) {
@@ -789,7 +805,7 @@ struct CombatView: View {
     }
 
     private func handCardID(at location: CGPoint) -> UUID? {
-        let matching = engine.current.hand
+        let matching = playerState.hand
             .enumerated()
             .filter { handCardFrames[$0.element.id]?.contains(location) == true }
 
@@ -831,7 +847,7 @@ struct CombatView: View {
                     guard isPlayerInteractionEnabled else { return }
                     engine.invokeGod(handIndex: index)
                 } label: { labelChip("Invoquer", system: "bolt.heart.fill") }
-                .disabled(!isPlayerInteractionEnabled || engine.current.blood < c.bloodCost || engine.current.godSlot != nil)
+                .disabled(!isPlayerInteractionEnabled || playerState.blood < c.bloodCost || playerState.godSlot != nil)
             }
         }
     }
@@ -1125,20 +1141,20 @@ struct CombatView: View {
     }
 
     private func firstOccupiedBoardSlot() -> Int? {
-        engine.current.board.firstIndex(where: { $0 != nil })
+        playerState.board.firstIndex(where: { $0 != nil })
     }
 
     private var pendingRitualKind: RitualKind? {
         guard let idx = pendingRitualHandIndex,
               idx >= 0,
-              idx < engine.current.hand.count else {
+              idx < playerState.hand.count else {
             return nil
         }
-        return engine.current.hand[idx].ritual
+        return playerState.hand[idx].ritual
     }
 
     private var availableRitualTargetSlots: [Int] {
-        engine.current.board.enumerated().compactMap { offset, card in
+        playerState.board.enumerated().compactMap { offset, card in
             card == nil ? nil : offset
         }
     }
@@ -1239,7 +1255,7 @@ struct CombatView: View {
 
 private extension CombatView {
     var laneAttackButtons: some View {
-        ForEach(engine.current.board.indices, id: \.self) { i in
+        ForEach(enemyState.board.indices, id: \.self) { i in
             Button("Lane \(i + 1)") {
                 if let from = attackFromSlot {
                     engine.attack(from: from, to: .boardSlot(i))
