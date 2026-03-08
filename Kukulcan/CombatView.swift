@@ -227,10 +227,10 @@ struct CombatView: View {
 
                     Spacer(minLength: 0)
                 }
-                .frame(maxWidth: 560)
+                .frame(maxWidth: 560, maxHeight: .infinity, alignment: .center)
                 .padding(.horizontal, combatSceneHorizontalPadding)
                 .padding(.top, 8)
-                .padding(.bottom, handCardHeight + max(20, geometry.safeAreaInsets.bottom + 12))
+                .padding(.bottom, max(8, geometry.safeAreaInsets.bottom))
                 .frame(maxWidth: .infinity)
 
                 if showBloodRiver {
