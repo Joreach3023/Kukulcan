@@ -44,6 +44,8 @@ struct AppStorage<Value> {
 
 /// Stocke la collection du joueur + ouverture de packs + persistance JSON
 final class CollectionStore: ObservableObject {
+    private let startingGold = 10_000
+
     // Persistance locale
     @AppStorage("owned_cards_v2") private var ownedData: Data = Data()
     @AppStorage("player_decks_v1") private var decksData: Data = Data()
@@ -59,12 +61,12 @@ final class CollectionStore: ObservableObject {
     }
 
     // Monnaie du joueur
-    @AppStorage("player_gold_v1") var gold: Int = 0
+    @AppStorage("player_gold_v1") var gold: Int = 10_000
 
     init(store: UserDefaults = .standard) {
         _ownedData = AppStorage(wrappedValue: Data(), "owned_cards_v2", store: store)
         _decksData = AppStorage(wrappedValue: Data(), "player_decks_v1", store: store)
-        _gold = AppStorage(wrappedValue: 0, "player_gold_v1", store: store)
+        _gold = AppStorage(wrappedValue: startingGold, "player_gold_v1", store: store)
         load()
         loadDecks()
     }
@@ -188,7 +190,6 @@ final class CollectionStore: ObservableObject {
     func resetCollection() {
         owned.removeAll()
         decks.removeAll()
-        gold = 0
+        gold = startingGold
     }
 }
-
