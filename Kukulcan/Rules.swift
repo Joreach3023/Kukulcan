@@ -71,12 +71,14 @@ struct CardInstance: Identifiable, Codable, Hashable {
     let base: Card
     var currentHP: Int
     var currentAttack: Int
+    var hasActedThisTurn: Bool
 
-    init(_ card: Card, id: UUID = UUID(), currentHP: Int? = nil, currentAttack: Int? = nil) {
+    init(_ card: Card, id: UUID = UUID(), currentHP: Int? = nil, currentAttack: Int? = nil, hasActedThisTurn: Bool = false) {
         self.id = id
         self.base = card
         self.currentHP = currentHP ?? max(1, card.health)
         self.currentAttack = currentAttack ?? card.attack
+        self.hasActedThisTurn = hasActedThisTurn
     }
 }
 
@@ -90,7 +92,7 @@ struct PlayerState: Codable {
     var hand: [Card] = []
     var discard: [Card] = []
 
-    var board: [CardInstance?] = Array(repeating: nil, count: 4)   // communes
+    var board: [CardInstance?] = Array(repeating: nil, count: 3)   // communes
     var sacrificeSlot: CardInstance? = nil                         // commune sacrifiée (visuelle)
     var godSlot: CardInstance? = nil                               // 1 seul dieu
 
@@ -113,7 +115,7 @@ struct PlayerState: Codable {
 
 enum Target {
     case player                          // viser les PV du joueur adverse
-    case boardSlot(Int)                  // viser une carte sur le board (0..3)
+    case boardSlot(Int)                  // viser une carte sur le board
     case god                             // viser le dieu adverse s’il existe
 }
 
@@ -279,6 +281,8 @@ final class GameEngine: ObservableObject {
             attacker = atkOwner.board[slot]
         }
         guard var atker = attacker else { return }
+        guard !atker.hasActedThisTurn else { return }
+        atker.hasActedThisTurn = true
 
         func assignBackAttacker() {
             if isGod {
@@ -341,9 +345,36 @@ final class GameEngine: ObservableObject {
         resetEndTurnState()
         // Le sang n'est pas réinitialisé : il s'accumule d'un tour à l'autre
         currentPlayerIsP1.toggle()
+        resetActionStateForCurrentPlayer()
         log.append("—— Tour terminé. À \(activeName()) de jouer.")
         // pioche automatique
         drawForCurrent(1)
+    }
+
+    private func resetActionStateForCurrentPlayer() {
+        if currentPlayerIsP1 {
+            for i in 0..<p1.board.count {
+                if var inst = p1.board[i] {
+                    inst.hasActedThisTurn = false
+                    p1.board[i] = inst
+                }
+            }
+            if var god = p1.godSlot {
+                god.hasActedThisTurn = false
+                p1.godSlot = god
+            }
+        } else {
+            for i in 0..<p2.board.count {
+                if var inst = p2.board[i] {
+                    inst.hasActedThisTurn = false
+                    p2.board[i] = inst
+                }
+            }
+            if var god = p2.godSlot {
+                god.hasActedThisTurn = false
+                p2.godSlot = god
+            }
+        }
     }
 
     /// Réinitialise les informations temporaires de fin de tour

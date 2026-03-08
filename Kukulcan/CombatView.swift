@@ -61,6 +61,8 @@ struct CombatView: View {
     @State private var pendingDrawCards: [Card] = []
     @State private var currentDrawFlight: DrawFlight? = nil
     @State private var drawProgress: CGFloat = 0
+    @State private var openingHandCardIDs: Set<UUID> = []
+    @State private var displayedHandCardIDs: Set<UUID> = []
     @State private var hiddenHandCardIDs: Set<UUID> = []
     @State private var hasAnimatedOpeningHand = false
 
@@ -85,11 +87,11 @@ struct CombatView: View {
     // Tailles réduites pour mieux voir l’ensemble du plateau
     private let slotCardWidth: CGFloat = 60
     private let slotCardHeight: CGFloat = 84
-    private let deckCardWidth: CGFloat = 40
-    private let deckCardHeight: CGFloat = 56
+    private let deckCardWidth: CGFloat = 60
+    private let deckCardHeight: CGFloat = 84
     private let handCardWidth: CGFloat = 90
     private var handCardHeight: CGFloat { handCardWidth * 1.4 }
-    private let enemyTurnStepDelay: TimeInterval = 0.6
+    private let enemyTurnStepDelay: TimeInterval = 1.4
 
     private var isPlayerInteractionEnabled: Bool {
         turnPhase == .playerTurn && outcome == nil
@@ -109,7 +111,7 @@ struct CombatView: View {
 
                     Divider().opacity(0.3)
 
-                    // Board du joueur (4 slots)
+                    // Board du joueur (3 slots)
                     boardArea
 
                     // Zone Dieu + Sacrifice + Défausse
@@ -311,7 +313,7 @@ struct CombatView: View {
     private var opponentBoardArea: some View {
         VStack(spacing: 6) {
             HStack(spacing: 8) {
-                ForEach(0..<4) { i in
+                ForEach(0..<3) { i in
                     let inst = engine.opponent.board[i]
                     slotView(for: inst?.base, hp: inst?.currentHP)
                 }
@@ -326,7 +328,7 @@ struct CombatView: View {
                     if engine.opponent.deck.isEmpty {
                         emptySlot(width: deckCardWidth, height: deckCardHeight)
                     } else {
-                        CardBackView().frame(width: deckCardWidth, height: deckCardHeight)
+                        CardBackView(width: deckCardWidth).frame(width: deckCardWidth, height: deckCardHeight)
                         Text("\(engine.opponent.deck.count)")
                             .font(.headline.bold())
                             .foregroundStyle(.white)
@@ -386,7 +388,7 @@ struct CombatView: View {
         VStack(spacing: 6) {
             Text("Tes unités").font(.caption).foregroundStyle(.secondary)
             HStack(spacing: 8) {
-                ForEach(0..<4) { i in
+                ForEach(0..<3) { i in
                     let inst = engine.current.board[i]
                     // Carte en jeu
                     ZStack(alignment: .topTrailing) {
@@ -414,6 +416,8 @@ struct CombatView: View {
                                                 .background(Circle().fill(.orange))
                                                 .foregroundStyle(.white)
                                         }
+                                        .disabled(inst?.hasActedThisTurn != false)
+                                        .opacity(inst?.hasActedThisTurn == true ? 0.45 : 1)
                                     }
                                 }
                                 .padding(6)
@@ -435,7 +439,7 @@ struct CombatView: View {
                     if engine.current.deck.isEmpty {
                         emptySlot(width: deckCardWidth, height: deckCardHeight)
                     } else {
-                        CardBackView().frame(width: deckCardWidth, height: deckCardHeight)
+                        CardBackView(width: deckCardWidth).frame(width: deckCardWidth, height: deckCardHeight)
                         Text("\(engine.current.deck.count)")
                             .font(.headline.bold())
                             .foregroundStyle(.white)
@@ -455,18 +459,20 @@ struct CombatView: View {
                 ZStack(alignment: .topTrailing) {
                     slotView(for: engine.current.godSlot?.base, hp: engine.current.godSlot?.currentHP)
                         .frame(width: slotCardWidth, height: slotCardHeight)
-                                    if engine.current.godSlot != nil {
-                                        Button {
-                                            guard isPlayerInteractionEnabled else { return }
-                                            attackFromSlot = -1
-                                            showAttackPicker = true
-                                        } label: {
+                    if engine.current.godSlot != nil {
+                        Button {
+                            guard isPlayerInteractionEnabled else { return }
+                            attackFromSlot = -1
+                            showAttackPicker = true
+                        } label: {
                             Image(systemName: "target")
                                 .font(.caption2.bold())
                                 .padding(6)
                                 .background(Circle().fill(.orange))
                                 .foregroundStyle(.white)
                         }
+                        .disabled(engine.current.godSlot?.hasActedThisTurn != false)
+                        .opacity(engine.current.godSlot?.hasActedThisTurn == true ? 0.45 : 1)
                         .padding(6)
                     }
                 }
@@ -526,7 +532,8 @@ struct CombatView: View {
                         selectedCard = c
                     }
                     .rotation3DEffect(.degrees(12), axis: (x: 1, y: 0, z: 0))
-                    .opacity((hiddenHandCardIDs.contains(c.id) || draggingCardIndex == idx) ? 0 : 1)
+                    .opacity(((openingHandCardIDs.contains(c.id) && !displayedHandCardIDs.contains(c.id)) || hiddenHandCardIDs.contains(c.id) || draggingCardIndex == idx) ? 0 : 1)
+                    .allowsHitTesting(!openingHandCardIDs.contains(c.id) || displayedHandCardIDs.contains(c.id))
                     .background(
                         GeometryReader { geo in
                             Color.clear.preference(key: HandCardFramePreferenceKey.self, value: [c.id: geo.frame(in: .named("combatArea"))])
@@ -597,7 +604,6 @@ struct CombatView: View {
                     Button("Poser → Empl. 1") { engine.playCommonToBoard(handIndex: index, slot: 0) }
                     Button("Poser → Empl. 2") { engine.playCommonToBoard(handIndex: index, slot: 1) }
                     Button("Poser → Empl. 3") { engine.playCommonToBoard(handIndex: index, slot: 2) }
-                    Button("Poser → Empl. 4") { engine.playCommonToBoard(handIndex: index, slot: 3) }
                     Divider()
                     Button("Sacrifier (+1 Sang)") { engine.sacrificeCommon(handIndex: index) }
                 } label: {
@@ -630,6 +636,8 @@ struct CombatView: View {
         hasAnimatedOpeningHand = true
         let openingHand = engine.p1.hand
         guard !openingHand.isEmpty else { return }
+        openingHandCardIDs = Set(openingHand.map(\.id))
+        displayedHandCardIDs.removeAll()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             enqueueDrawAnimation(openingHand)
         }
@@ -657,12 +665,13 @@ struct CombatView: View {
         currentDrawFlight = DrawFlight(card: card, start: CGPoint(x: deckFrame.midX, y: deckFrame.midY), end: CGPoint(x: targetFrame.midX, y: targetFrame.midY))
         drawProgress = 0
 
-        withAnimation(.timingCurve(0.22, 0.95, 0.18, 1, duration: 0.55)) {
+        withAnimation(.timingCurve(0.22, 0.95, 0.18, 1, duration: 0.95)) {
             drawProgress = 1
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.95) {
             hiddenHandCardIDs.remove(card.id)
+            displayedHandCardIDs.insert(card.id)
             currentDrawFlight = nil
             drawProgress = 0
             processPendingDrawAnimations()
@@ -705,11 +714,11 @@ struct CombatView: View {
 
         if didDraw {
             animateEnemyDraw()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.25) {
                 completion()
             }
         } else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 completion()
             }
         }
@@ -724,7 +733,7 @@ struct CombatView: View {
                 completion()
             }
         } else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 completion()
             }
         }
@@ -777,11 +786,11 @@ struct CombatView: View {
         guard enemyDeckFrame != .zero, enemyHandFrame != .zero else { return }
         isEnemyDrawAnimating = true
         enemyDrawProgress = 0
-        withAnimation(.timingCurve(0.22, 0.95, 0.18, 1, duration: 0.55)) {
+        withAnimation(.timingCurve(0.22, 0.95, 0.18, 1, duration: 0.95)) {
             enemyDrawProgress = 1
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.95) {
             isEnemyDrawAnimating = false
             enemyDrawProgress = 0
         }
@@ -918,7 +927,6 @@ struct CombatView: View {
                     Text("Empl. 1").tag(0)
                     Text("Empl. 2").tag(1)
                     Text("Empl. 3").tag(2)
-                    Text("Empl. 4").tag(3)
                 }
                 .pickerStyle(.wheel)
 
@@ -963,7 +971,7 @@ struct CombatView: View {
                 }
 
                 HStack(spacing: 8) {
-                    ForEach(0..<4) { i in
+                    ForEach(0..<3) { i in
                         Button("Lane \(i+1)") {
                             if let from = attackFromSlot {
                                 engine.attack(from: from, to: .boardSlot(i))
