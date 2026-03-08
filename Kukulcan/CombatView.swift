@@ -65,6 +65,7 @@ struct CombatView: View {
     // Fournis un engine depuis l’extérieur si tu veux (collection/IA), sinon starter par défaut
     @StateObject private var engine: GameEngine
     private let aiLevel: Int
+    private let playerRelics: [Relic]
     var onWin: ((Int) -> Void)? = nil
     var onLoss: (() -> Void)? = nil
     private let winGold: Int
@@ -73,11 +74,12 @@ struct CombatView: View {
 
     @State private var outcome: CombatOutcome? = nil
 
-    init(engine: GameEngine? = nil, aiLevel: Int = 1, onWin: ((Int) -> Void)? = nil, onLoss: (() -> Void)? = nil, winGold: Int = 0, lossGold: Int = 0) {
+    init(engine: GameEngine? = nil, aiLevel: Int = 1, playerRelics: [Relic] = [], onWin: ((Int) -> Void)? = nil, onLoss: (() -> Void)? = nil, winGold: Int = 0, lossGold: Int = 0) {
         self.aiLevel = aiLevel
         self.onWin = onWin
         self.onLoss = onLoss
         self.winGold = winGold
+        self.playerRelics = playerRelics
         self.lossGold = lossGold
         if let e = engine {
             _engine = StateObject(wrappedValue: e)
@@ -97,6 +99,7 @@ struct CombatView: View {
     @State private var attackFromSlot: Int? = nil  // -1 = dieu
 
     @State private var selectedCard: Card? = nil
+    @State private var showRelicsSheet = false
 
     @State private var showBloodRiver = false
 
@@ -391,6 +394,10 @@ struct CombatView: View {
             attackTargetSheet
                 .presentationDetents([.height(320)])
         }
+        .sheet(isPresented: $showRelicsSheet) {
+            RelicsPanelView(relics: playerRelics)
+                .presentationDetents([.medium, .large])
+        }
         .navigationTitle("Combats")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
@@ -403,6 +410,11 @@ struct CombatView: View {
                 .opacity(isPlayerInteractionEnabled ? 1 : 0.7)
         }
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                RelicsButton(count: playerRelics.count) {
+                    showRelicsSheet = true
+                }
+            }
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 Button("Fin du tour") {
                     endPlayerTurnAndRunEnemySequence()

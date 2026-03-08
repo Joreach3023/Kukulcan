@@ -3,6 +3,7 @@ import UIKit
 
 struct RunMapView: View {
     @StateObject private var runManager = RunManager()
+    @State private var showRelicsSheet = false
 
     private let mapAspectRatio: CGFloat = 0.6
     private let mapColumns: CGFloat = 7
@@ -61,6 +62,10 @@ struct RunMapView: View {
                 }
             }
         }
+        .sheet(isPresented: $showRelicsSheet) {
+            RelicsPanelView(relics: runManager.runState?.player.relics ?? [])
+                .presentationDetents([.medium, .large])
+        }
         .sheet(isPresented: Binding(
             get: { !runManager.pendingRewards.isEmpty },
             set: { _ in }
@@ -111,6 +116,7 @@ struct RunMapView: View {
                     p2: PlayerState(name: battle.enemy.name, deck: StarterFactory.randomDeck())
                 ),
                 aiLevel: 1,
+                playerRelics: runManager.runState?.player.relics ?? [],
                 onWin: { _ in
                     runManager.handleBattleVictory(battle.nodeID)
                 },
@@ -136,6 +142,10 @@ struct RunMapView: View {
             HStack(spacing: 8) {
                 compactBadge(text: "Deck \(run.player.deck.count)", icon: "rectangle.stack.fill")
                 compactBadge(text: "Reliques \(run.player.relics.count)", icon: "sparkles")
+                Spacer(minLength: 0)
+                RelicsButton(count: run.player.relics.count) {
+                    showRelicsSheet = true
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
