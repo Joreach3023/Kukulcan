@@ -17,6 +17,50 @@ private enum TurnPhase {
     case playerDrawing
 }
 
+private enum HitShakeProfile {
+    case light
+    case heavy
+
+    var amplitude: CGFloat {
+        switch self {
+        case .light: return 8
+        case .heavy: return 14
+        }
+    }
+
+    var duration: TimeInterval {
+        switch self {
+        case .light: return 0.18
+        case .heavy: return 0.24
+        }
+    }
+}
+
+private struct DamagePopup: Identifiable {
+    let id = UUID()
+    let value: Int
+    let laneOffset: CGFloat
+    let isIncoming: Bool
+}
+
+private struct RitualSequenceState {
+    var dim: Double = 0
+    var aura: Double = 0
+    var projectile: CGFloat = 0
+    var glyph: Double = 0
+    var impact: Double = 0
+}
+
+private struct HealthSnapshot {
+    let playerHP: Int
+    let enemyHP: Int
+
+    init(engine: GameEngine) {
+        playerHP = engine.p1.hp
+        enemyHP = engine.p2.hp
+    }
+}
+
 struct CombatView: View {
     // Fournis un engine depuis l’extérieur si tu veux (collection/IA), sinon starter par défaut
     @StateObject private var engine: GameEngine
@@ -75,6 +119,14 @@ struct CombatView: View {
     @State private var enemyActionCard: Card? = nil
     @State private var enemyAttackPulse = false
     @State private var enemyAttackLineVisible = false
+    @State private var combatShakeOffset: CGSize = .zero
+    @State private var isShakingCombat = false
+    @State private var incomingDamageFlash: Double = 0
+    @State private var enemyHitBounce: CGFloat = 1
+    @State private var ritualState = RitualSequenceState()
+    @State private var ritualInProgress = false
+    @State private var ritualTintColor: Color = .cyan
+    @State private var damagePopups: [DamagePopup] = []
 
     // Drag & drop depuis la main vers le board
     @State private var draggingCardIndex: Int? = nil
@@ -224,6 +276,7 @@ struct CombatView: View {
 
                     // Plateau adverse miroité
                     opponentBoard
+                        .scaleEffect(enemyHitBounce)
 
                     Spacer(minLength: 2)
 
@@ -240,6 +293,9 @@ struct CombatView: View {
                 .padding(.top, 8)
                 .padding(.bottom, max(8, geometry.safeAreaInsets.bottom))
                 .frame(maxWidth: .infinity)
+                .offset(combatShakeOffset)
+                .overlay(alignment: .center) { ritualVisualOverlay }
+                .overlay(alignment: .top) { damagePopupsOverlay }
 
                 if showBloodRiver {
                     BloodRiverView()
@@ -277,6 +333,12 @@ struct CombatView: View {
                         .zIndex(4)
                         .allowsHitTesting(false)
                 }
+
+                Color.red
+                    .opacity(incomingDamageFlash)
+                    .ignoresSafeArea()
+                    .zIndex(4)
+                    .allowsHitTesting(false)
 
                 if let turnBanner {
                     Text(turnBanner)
@@ -846,7 +908,7 @@ struct CombatView: View {
                         ritualTargetSlot = firstOccupiedBoardSlot()
                         showTargetPickerForRitual = true
                     } else {
-                        engine.playRitual(handIndex: index)
+                        performPlayerRitual(handIndex: index)
                     }
                 } label: { labelChip("Rituel", system: "wand.and.stars") }
                 .disabled(!isPlayerInteractionEnabled)
@@ -1062,7 +1124,216 @@ struct CombatView: View {
     private func performEnemyAttacks() {
         let plan = enemyAI.chooseAttackPlan(engine: engine)
         for attack in plan {
-            engine.attack(from: attack.attackerSlot, to: attack.target)
+            performEnemyAttack(from: attack.attackerSlot, to: attack.target)
+        }
+    }
+
+    private func performPlayerAttack(from slot: Int, to target: Target) {
+        let before = HealthSnapshot(engine: engine)
+        engine.attack(from: slot, to: target)
+        let after = HealthSnapshot(engine: engine)
+        applyHitFeedback(before: before, after: after, initiatedByPlayer: true)
+    }
+
+    private func performEnemyAttack(from slot: Int, to target: Target) {
+        let before = HealthSnapshot(engine: engine)
+        engine.attack(from: slot, to: target)
+        let after = HealthSnapshot(engine: engine)
+        applyHitFeedback(before: before, after: after, initiatedByPlayer: false)
+    }
+
+    private func performPlayerRitual(handIndex: Int, targetSlot: Int? = nil) {
+        guard handIndex >= 0, handIndex < engine.current.hand.count else { return }
+        let ritual = engine.current.hand[handIndex].ritual
+        playRitualSequence(kind: ritual)
+        engine.playRitual(handIndex: handIndex, targetSlot: targetSlot)
+    }
+
+    private func applyHitFeedback(before: HealthSnapshot, after: HealthSnapshot, initiatedByPlayer: Bool) {
+        let enemyDamage = max(0, before.enemyHP - after.enemyHP)
+        let playerDamage = max(0, before.playerHP - after.playerHP)
+
+        if enemyDamage > 0 {
+            triggerCombatShake(.light)
+            bounceEnemyBoard()
+            spawnDamagePopup(value: enemyDamage, isIncoming: false)
+        }
+
+        if playerDamage > 0 {
+            triggerCombatShake(.heavy)
+            spawnDamagePopup(value: playerDamage, isIncoming: true)
+            triggerIncomingDamageFlash()
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
+
+        if enemyDamage == 0 && playerDamage == 0 && initiatedByPlayer {
+            triggerCombatShake(.light)
+        }
+    }
+
+    private func triggerCombatShake(_ profile: HitShakeProfile) {
+        guard !isShakingCombat else { return }
+        isShakingCombat = true
+        withAnimation(.easeInOut(duration: profile.duration / 4)) {
+            combatShakeOffset = CGSize(width: profile.amplitude, height: 0)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + profile.duration / 4) {
+            withAnimation(.easeInOut(duration: profile.duration / 4)) {
+                combatShakeOffset = CGSize(width: -profile.amplitude * 0.65, height: 0)
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + profile.duration / 2) {
+            withAnimation(.easeOut(duration: profile.duration / 2)) {
+                combatShakeOffset = .zero
+            }
+            isShakingCombat = false
+        }
+    }
+
+    private func bounceEnemyBoard() {
+        withAnimation(.spring(response: 0.16, dampingFraction: 0.55)) {
+            enemyHitBounce = 1.06
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
+            withAnimation(.spring(response: 0.22, dampingFraction: 0.85)) {
+                enemyHitBounce = 1
+            }
+        }
+    }
+
+    private func triggerIncomingDamageFlash() {
+        withAnimation(.easeOut(duration: 0.12)) {
+            incomingDamageFlash = 0.22
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            withAnimation(.easeIn(duration: 0.2)) {
+                incomingDamageFlash = 0
+            }
+        }
+    }
+
+    private func spawnDamagePopup(value: Int, isIncoming: Bool) {
+        let popup = DamagePopup(
+            value: value,
+            laneOffset: CGFloat.random(in: -22...22),
+            isIncoming: isIncoming
+        )
+        damagePopups.append(popup)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            damagePopups.removeAll { $0.id == popup.id }
+        }
+    }
+
+    private func playRitualSequence(kind: RitualKind?) {
+        guard !ritualInProgress else { return }
+        ritualInProgress = true
+        ritualTintColor = ritualTint(for: kind)
+
+        withAnimation(.easeOut(duration: 0.3)) {
+            ritualState.dim = 0.28
+            ritualState.aura = 1
+            ritualState.glyph = 0.75
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                ritualState.projectile = 1
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+            withAnimation(.easeOut(duration: 0.2)) {
+                ritualState.impact = 1
+            }
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.82) {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                ritualState = RitualSequenceState()
+            }
+            ritualInProgress = false
+        }
+    }
+
+    private func ritualTint(for kind: RitualKind?) -> Color {
+        switch kind {
+        case .obsidianKnife:
+            return Color(red: 0.4, green: 0.92, blue: 0.85)
+        case .bloodAltar:
+            return Color(red: 0.58, green: 0.08, blue: 0.12)
+        case .forestCharm:
+            return Color(red: 0.98, green: 0.82, blue: 0.24)
+        case nil:
+            return Color.cyan
+        }
+    }
+
+    private var ritualVisualOverlay: some View {
+        GeometryReader { geo in
+            let source = CGPoint(x: geo.size.width * 0.42, y: geo.size.height * 0.72)
+            let target = CGPoint(x: geo.size.width * 0.56, y: geo.size.height * 0.26)
+            let projectileX = source.x + (target.x - source.x) * ritualState.projectile
+            let projectileY = source.y + (target.y - source.y) * ritualState.projectile
+            let tint = ritualTintColor
+
+            ZStack {
+                Color.black
+                    .opacity(ritualState.dim)
+                    .ignoresSafeArea()
+
+                Circle()
+                    .fill(tint.opacity(0.28))
+                    .frame(width: 150, height: 150)
+                    .overlay(Circle().stroke(tint.opacity(0.9), lineWidth: 2.2))
+                    .scaleEffect(0.85 + (ritualState.aura * 0.25))
+                    .position(source)
+                    .blur(radius: 0.6)
+
+                Image(systemName: "seal.fill")
+                    .font(.system(size: 52))
+                    .foregroundStyle(tint.opacity(0.45))
+                    .position(x: source.x, y: source.y - 10)
+                    .opacity(ritualState.glyph)
+                    .rotationEffect(.degrees(ritualState.glyph * 36))
+
+                Circle()
+                    .fill(tint)
+                    .frame(width: 22, height: 22)
+                    .position(x: projectileX, y: projectileY)
+                    .opacity(ritualState.projectile > 0 ? 0.95 : 0)
+                    .shadow(color: tint, radius: 10)
+
+                Circle()
+                    .fill(Color.white.opacity(0.85))
+                    .frame(width: 124, height: 124)
+                    .position(target)
+                    .opacity(ritualState.impact)
+                    .blur(radius: 2)
+            }
+            .allowsHitTesting(false)
+            .opacity(ritualInProgress ? 1 : 0)
+        }
+    }
+
+    private var damagePopupsOverlay: some View {
+        GeometryReader { geo in
+            ZStack {
+                ForEach(damagePopups) { popup in
+                    Text("-\(popup.value)")
+                        .font(.title3.bold())
+                        .foregroundStyle(popup.isIncoming ? .red : .white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.black.opacity(0.55), in: Capsule())
+                        .position(
+                            x: (geo.size.width * 0.52) + popup.laneOffset,
+                            y: popup.isIncoming ? geo.size.height * 0.72 : geo.size.height * 0.24
+                        )
+                        .transition(.opacity.combined(with: .scale))
+                }
+            }
+            .allowsHitTesting(false)
         }
     }
 
@@ -1206,7 +1477,7 @@ struct CombatView: View {
                     Spacer()
                     Button("Jouer") {
                         if let handIdx = pendingRitualHandIndex {
-                            engine.playRitual(handIndex: handIdx, targetSlot: ritualTargetSlot)
+                            performPlayerRitual(handIndex: handIdx, targetSlot: ritualTargetSlot)
                         }
                         pendingRitualHandIndex = nil
                         ritualTargetSlot = nil
@@ -1228,7 +1499,7 @@ struct CombatView: View {
 
                 Button("Joueur adverse (PV)") {
                     if let from = attackFromSlot {
-                        engine.attack(from: from, to: .player)
+                        performPlayerAttack(from: from, to: .player)
                     }
                     showAttackPicker = false
                 }
@@ -1238,7 +1509,7 @@ struct CombatView: View {
 
                 Button("Dieu adverse") {
                     if let from = attackFromSlot {
-                        engine.attack(from: from, to: .god)
+                        performPlayerAttack(from: from, to: .god)
                     }
                     showAttackPicker = false
                 }
@@ -1267,7 +1538,7 @@ private extension CombatView {
         ForEach(engine.current.board.indices, id: \.self) { i in
             Button("Lane \(i + 1)") {
                 if let from = attackFromSlot {
-                    engine.attack(from: from, to: .boardSlot(i))
+                    performPlayerAttack(from: from, to: .boardSlot(i))
                 }
                 showAttackPicker = false
             }
