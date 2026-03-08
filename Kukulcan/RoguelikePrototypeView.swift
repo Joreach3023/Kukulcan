@@ -1,12 +1,6 @@
 import SwiftUI
 
 struct RoguelikePrototypeView: View {
-    private let choices = [
-        "Renforcer une carte existante",
-        "Ajouter une nouvelle carte au deck",
-        "Stocker de l'or pour la boutique suivante"
-    ]
-
     @State private var playerHP = 26
     @State private var gold = 0
     @State private var floor = 1
@@ -43,215 +37,133 @@ struct RoguelikePrototypeView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                headerSection
-                conceptSection
-                cardsSection
-                importedCardsSection
-                loopSection
-                gameplaySection
-                shopSection
-                bossSection
-                roguelikeSection
-                prototypeSection
+        GeometryReader { geo in
+            let bottomInset = geo.safeAreaInsets.bottom
+
+            ZStack {
+                Image("bg_jungle_far")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .clipped()
+                    .overlay {
+                        LinearGradient(
+                            colors: [.black.opacity(0.45), .clear, .black.opacity(0.65)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+
+                VStack(spacing: 12) {
+                    topHud
+
+                    if let boss = currentBoss, currentPhase == .boss {
+                        bossBanner(boss)
+                    }
+
+                    Spacer()
+
+                    bottomHud
+                        .padding(.bottom, max(12, bottomInset + 8))
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 12)
             }
-            .padding()
         }
         .navigationTitle("Roguelike")
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if deck.isEmpty { resetRun() }
         }
     }
 
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Prototype Roguelike")
-                .font(.largeTitle.bold())
-
-            Text("La run utilise maintenant les cartes existantes du jeu : communes, rituels et dieux légendaires comme boss.")
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var conceptSection: some View {
-        GroupBox("🎮 Concept général") {
-            Text("Enchaînez des combats contre des IA, gagnez de l'or, recrutez de vraies cartes de Kukulcan pendant la run et terrassez tous les dieux. Le dernier boss est toujours Kukulcan.")
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var cardsSection: some View {
-        GroupBox("🃏 Système de cartes") {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Chaque carte importée garde :")
-                Label("Points de vie (HP)", systemImage: "heart.fill")
-                Label("Points d'attaque (ATK)", systemImage: "bolt.fill")
-                Label("Rareté et effets déjà définis", systemImage: "sparkles")
+    private var topHud: some View {
+        VStack(spacing: 8) {
+            HStack(alignment: .top) {
+                hudBadge(title: "HP", value: "\(playerHP)", systemImage: "heart.fill", tint: .red)
+                Spacer()
+                hudBadge(title: "Or", value: "\(gold)", systemImage: "bitcoinsign.circle.fill", tint: .yellow)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
 
-    private var importedCardsSection: some View {
-        GroupBox("📦 Cartes importées dans la run") {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Deck actuel : \(deck.count) cartes • ATK run \(runAttackPower) • Buffer \(runHealthBuffer)")
-                    .font(.subheadline.bold())
-
-                ForEach(Array(deck.prefix(6)), id: \.id) { card in
-                    HStack {
-                        Text(card.name)
-                        Spacer()
-                        Text(card.rarity.rawValue.capitalized)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                if deck.count > 6 {
-                    Text("+\(deck.count - 6) autres cartes…")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
-                Divider()
-
-                Text("Progression des boss légendaires")
-                    .font(.subheadline.bold())
-                ForEach(Array(bossSequence.enumerated()), id: \.element.id) { index, boss in
-                    Label {
-                        Text("\(boss.name) \(index < currentBossIndex ? "✅" : "")")
-                    } icon: {
-                        Image(systemName: index == currentBossIndex ? "flame.fill" : "crown.fill")
-                    }
-                    .foregroundStyle(index == bossSequence.count - 1 ? .orange : .primary)
-                }
+            HStack(spacing: 8) {
+                compactBadge(label: "Étage \(floor)", icon: "stairs")
+                compactBadge(label: "\(currentPhase.title)", icon: "bolt.fill")
+                compactBadge(label: "Deck \(deck.count)", icon: "rectangle.stack.fill")
+                compactBadge(label: "Reliques \(currentBossIndex)", icon: "sparkles")
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private var loopSection: some View {
-        GroupBox("⚔️ Boucle de gameplay principale") {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("1. Démarrer une nouvelle run")
-                Text("2. Combattre un ennemi IA")
-                Text("3. Gagner de l'or après la victoire")
-                Text("4. Passer en boutique/recrutement")
-                Text("5. Importer 1 carte depuis la base du jeu")
-                Text("6. Renforcer son deck de run")
-                Text("7. Affronter un boss légendaire aux étages clés")
-                Text("8. Finir contre Kukulcan")
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var shopSection: some View {
-        GroupBox("🏪 Boutique & recrutement") {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Après certains combats :")
-                Text("• Dépenser votre or")
-                Text("• Tirer 3 cartes de la base existante")
-                Text("• Récupérer automatiquement la plus puissante")
-                Text("• Ajouter la carte au deck de la run")
-                Text("Objectif : créer des synergies réelles à partir des cartes déjà présentes dans le jeu.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var gameplaySection: some View {
-        GroupBox("🕹️ Gameplay jouable") {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Étage \(floor) • Phase : \(currentPhase.title)")
-                    .font(.headline)
-
-                if let boss = currentBoss, currentPhase == .boss {
-                    Text("Boss en cours : \(boss.name) (ATK \(boss.attack) / HP \(boss.health))")
-                        .font(.subheadline)
-                        .foregroundStyle(.orange)
-                }
-
-                HStack(spacing: 16) {
-                    Label("\(playerHP) HP", systemImage: "heart.fill")
-                    Label("\(gold) or", systemImage: "bitcoinsign.circle.fill")
-                    Label("Deck \(deck.count)", systemImage: "rectangle.stack.fill")
-                }
-                .font(.subheadline)
-
-                HStack(spacing: 10) {
-                    Button("Jouer la phase") {
-                        playCurrentPhase()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.orange)
-                    .disabled(isRunOver)
-
-                    Button("Nouvelle run") {
-                        resetRun()
-                    }
-                    .buttonStyle(.bordered)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Journal de run")
-                        .font(.subheadline.bold())
-                    ForEach(Array(log.suffix(6).reversed().enumerated()), id: \.offset) { _, entry in
-                        Text("• \(entry)")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var bossSection: some View {
-        GroupBox("👑 Boss légendaires") {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Chaque carte légendaire devient un boss de run.")
-                Text("L'ordre est aléatoire, sauf le dernier boss : Kukulcan.")
-                Text("Vaincre un boss donne de l'or et améliore votre deck.")
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var roguelikeSection: some View {
-        GroupBox("🔁 Philosophie roguelike") {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("• Runs courtes et rejouables")
-                Text("• Cartes réelles du jeu comme progression")
-                Text("• Boss légendaires à route variable")
-                Text("• Fin de run épique contre Kukulcan")
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var prototypeSection: some View {
-        GroupBox("🧪 Prototype rapide") {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Choisissez un prochain objectif pour votre run :")
-                ForEach(choices, id: \.self) { choice in
-                    Label(choice, systemImage: "circle")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                Button("Démarrer une run") {
-                    resetRun()
+    private var bottomHud: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                Button("Jouer la phase") {
+                    playCurrentPhase()
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.orange)
+                .disabled(isRunOver)
+
+                Button("New Run") {
+                    resetRun()
+                }
+                .buttonStyle(.bordered)
+                .tint(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Journal")
+                    .font(.caption.bold())
+                    .foregroundStyle(.white)
+
+                ForEach(Array(log.suffix(3).reversed().enumerated()), id: \.offset) { _, entry in
+                    Text("• \(entry)")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.9))
+                        .lineLimit(2)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
         }
+    }
+
+    private func hudBadge(title: String, value: String, systemImage: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption2.bold())
+                .foregroundStyle(.white.opacity(0.85))
+            Label(value, systemImage: systemImage)
+                .font(.headline.bold())
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.black.opacity(0.45))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(tint.opacity(0.85), lineWidth: 1))
+        )
+    }
+
+    private func compactBadge(label: String, icon: String) -> some View {
+        Label(label, systemImage: icon)
+            .font(.caption.bold())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(.black.opacity(0.45), in: Capsule())
+    }
+
+    private func bossBanner(_ boss: Card) -> some View {
+        Text("Boss: \(boss.name) • ATK \(boss.attack) / HP \(boss.health)")
+            .font(.subheadline.bold())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.orange.opacity(0.9), in: Capsule())
+            .shadow(radius: 8)
     }
 }
 
