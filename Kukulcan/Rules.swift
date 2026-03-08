@@ -127,9 +127,18 @@ final class GameEngine: ObservableObject {
     @Published private(set) var log: [String] = []
     @Published var lastDrawnCard: Card? = nil
     @Published var lastDrawnCards: [Card] = []
+    @Published private(set) var startingPlayerIsP1: Bool = true
+    @Published private(set) var p1CompletedTurns: Int = 0
+    @Published private(set) var p2CompletedTurns: Int = 0
 
     var current: PlayerState { currentPlayerIsP1 ? p1 : p2 }
     var opponent: PlayerState { currentPlayerIsP1 ? p2 : p1 }
+    var canCurrentPlayerAttack: Bool {
+        if currentPlayerIsP1 == startingPlayerIsP1 {
+            return currentPlayerIsP1 ? p1CompletedTurns > 0 : p2CompletedTurns > 0
+        }
+        return true
+    }
 
     init(p1: PlayerState, p2: PlayerState) {
         self.p1 = p1; self.p2 = p2
@@ -146,8 +155,16 @@ final class GameEngine: ObservableObject {
         // Mélange très simple
         p1.deck.shuffle(); p2.deck.shuffle()
         _ = p1.draw(mulligan); _ = p2.draw(mulligan)
+        autoDeployOpeningCommons(forP1: true)
+        autoDeployOpeningCommons(forP1: false)
+        startingPlayerIsP1 = Bool.random()
+        currentPlayerIsP1 = startingPlayerIsP1
+        p1CompletedTurns = 0
+        p2CompletedTurns = 0
         log.removeAll()
-        log.append("La partie commence. \(p1.name) joue en premier.")
+        log.append("La partie commence après la pose initiale des cartes.")
+        log.append("\(activeName()) joue en premier (tirage 50/50).")
+        log.append("Règle d'ouverture: le joueur qui commence ne peut pas attaquer à son premier tour.")
     }
 
     // MARK: actions (joueur courant)
@@ -268,6 +285,11 @@ final class GameEngine: ObservableObject {
 
     /// Attaque depuis un slot du board courant (ou le dieu si slot = -1) vers une cible
     func attack(from slot: Int, to target: Target) {
+        guard canCurrentPlayerAttack else {
+            log.append("\(activeName()) ne peut pas attaquer pendant son premier tour.")
+            return
+        }
+
         var atkOwner = current
         var defOwner = opponent
 
@@ -341,6 +363,11 @@ final class GameEngine: ObservableObject {
     }
 
     func endTurn() {
+        if currentPlayerIsP1 {
+            p1CompletedTurns += 1
+        } else {
+            p2CompletedTurns += 1
+        }
         // Nettoie les états temporaires du joueur actif
         resetEndTurnState()
         // Le sang n'est pas réinitialisé : il s'accumule d'un tour à l'autre
@@ -457,8 +484,26 @@ final class GameEngine: ObservableObject {
         p1 = PlayerState(name: p1.name, deck: StarterFactory.playerDeck())
         p2 = PlayerState(name: p2.name, deck: StarterFactory.randomDeck())
         currentPlayerIsP1 = true
+        startingPlayerIsP1 = true
+        p1CompletedTurns = 0
+        p2CompletedTurns = 0
         log.removeAll()
         start()
+    }
+
+    private func autoDeployOpeningCommons(forP1: Bool) {
+        var player = forP1 ? p1 : p2
+        for slot in player.board.indices {
+            guard let handIndex = player.hand.firstIndex(where: { $0.type == .common }) else { break }
+            let card = player.hand.remove(at: handIndex)
+            player.board[slot] = CardInstance(card)
+        }
+
+        if forP1 {
+            p1 = player
+        } else {
+            p2 = player
+        }
     }
 }
 
@@ -528,6 +573,7 @@ struct EnemyAI {
     }
 
     func chooseAttackPlan(engine: GameEngine) -> [PlannedAttack] {
+        guard engine.canCurrentPlayerAttack else { return [] }
         let state = AIState(current: engine.current, opponent: engine.opponent)
         let attackers = availableAttackers(from: state.current)
 
