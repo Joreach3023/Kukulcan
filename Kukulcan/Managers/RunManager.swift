@@ -292,13 +292,14 @@ final class RunManager: ObservableObject {
     }
 
     private func completeNode(_ nodeID: UUID, in state: inout RunState) {
-        guard let nodeIndex = state.nodes.firstIndex(where: { $0.id == nodeID }) else { return }
+        let indexByID = Dictionary(uniqueKeysWithValues: state.nodes.enumerated().map { ($0.element.id, $0.offset) })
+        guard let nodeIndex = indexByID[nodeID] else { return }
 
         state.nodes[nodeIndex].isCompleted = true
         disableCompetingNodes(in: state.nodes[nodeIndex].row, selectedNodeID: nodeID, state: &state)
         let nextIDs = state.nodes[nodeIndex].nextNodeIDs
         for nextID in nextIDs {
-            if let nextIndex = state.nodes.firstIndex(where: { $0.id == nextID }) {
+            if let nextIndex = indexByID[nextID] {
                 state.nodes[nextIndex].isUnlocked = true
             }
         }

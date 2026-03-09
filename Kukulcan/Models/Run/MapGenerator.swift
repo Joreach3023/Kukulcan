@@ -90,17 +90,14 @@ struct MapGenerator {
             }
         }
 
-        for row in 0..<(rows - 2) {
-            let rowNodes = edges.keys.filter { $0.row == row }
-            for node in rowNodes where (edges[node]?.isEmpty ?? true) {
-                let nextColumn = clamp(node.column + ([-1, 0, 1].randomElement(using: &rng) ?? 0), min: 0, max: columns - 1)
-                addEdge(from: node, to: NodePosition(row: row + 1, column: nextColumn), into: &edges)
-            }
+        let edgeKeys = Array(edges.keys)
+        for node in edgeKeys where node.row < rows - 2 && (edges[node]?.isEmpty ?? true) {
+            let nextColumn = clamp(node.column + ([-1, 0, 1].randomElement(using: &rng) ?? 0), min: 0, max: columns - 1)
+            addEdge(from: node, to: NodePosition(row: node.row + 1, column: nextColumn), into: &edges)
         }
 
         let bossPosition = NodePosition(row: rows - 1, column: columns / 2)
-        let penultimate = edges.keys.filter { $0.row == rows - 2 }
-        for node in penultimate {
+        for node in edgeKeys where node.row == rows - 2 {
             addEdge(from: node, to: bossPosition, into: &edges)
         }
 
@@ -138,6 +135,7 @@ struct MapGenerator {
         let allNodes = Set(adjacency.keys).union(adjacency.values.flatMap { $0 })
         let sortedNodes = allNodes.sorted()
         let bossPosition = NodePosition(row: rows - 1, column: columns / 2)
+        let parentsByChild = buildParentsMap(from: adjacency)
 
         for node in sortedNodes {
             if node == bossPosition {
@@ -152,7 +150,7 @@ struct MapGenerator {
                 weighted = weighted.filter { $0.type != .elite }
             }
 
-            if let previousType = parentTypes(of: node, adjacency: adjacency, assigned: result).first {
+            if let previousType = parentTypes(of: node, parentsByChild: parentsByChild, assigned: result).first {
                 if previousType == .elite {
                     weighted = weighted.filter { $0.type != .elite }
                 }
@@ -207,15 +205,22 @@ struct MapGenerator {
         }
     }
 
+    private func buildParentsMap(from adjacency: [NodePosition: Set<NodePosition>]) -> [NodePosition: [NodePosition]] {
+        var parentsByChild: [NodePosition: [NodePosition]] = [:]
+        for (parent, children) in adjacency {
+            for child in children {
+                parentsByChild[child, default: []].append(parent)
+            }
+        }
+        return parentsByChild
+    }
+
     private func parentTypes(
         of child: NodePosition,
-        adjacency: [NodePosition: Set<NodePosition>],
+        parentsByChild: [NodePosition: [NodePosition]],
         assigned: [NodePosition: NodeType]
     ) -> [NodeType] {
-        adjacency.compactMap { (parent, children) in
-            guard children.contains(child) else { return nil }
-            return assigned[parent]
-        }
+        (parentsByChild[child] ?? []).compactMap { assigned[$0] }
     }
 
     private func weightedTypes(for progress: Double) -> [(type: NodeType, weight: Double)] {
