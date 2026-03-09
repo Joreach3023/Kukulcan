@@ -31,6 +31,28 @@ struct EventInteraction: Identifiable {
     let event: MayaEvent
 }
 
+enum CardSelectionMode {
+    case upgrade
+    case addToDeck
+}
+
+struct CardSelectionInteraction: Identifiable {
+    let id = UUID()
+    let nodeID: UUID
+    let title: String
+    let description: String
+    let mode: CardSelectionMode
+    let upgradableCards: [RunCardInstance]
+    let cardChoices: [Card]
+}
+
+struct CardSelectionResult: Identifiable {
+    let id = UUID()
+    let title: String
+    let subtitle: String
+    let card: Card
+}
+
 @MainActor
 final class RunManager: ObservableObject {
     @Published private(set) var runState: RunState?
@@ -39,6 +61,8 @@ final class RunManager: ObservableObject {
     @Published var pendingCampfire: CampfireInteraction?
     @Published var pendingShop: ShopInteraction?
     @Published var pendingEvent: EventInteraction?
+    @Published var pendingCardSelection: CardSelectionInteraction?
+    @Published var pendingCardResult: CardSelectionResult?
 
     private let normalEnemies: [Card] = Array(CardsDB.commons.prefix(3))
     private let eliteEnemies: [Card] = Array(CardsDB.gods.filter { $0.name != "Kukulcan" }.prefix(3))
@@ -61,6 +85,8 @@ final class RunManager: ObservableObject {
         pendingCampfire = nil
         pendingShop = nil
         pendingEvent = nil
+        pendingCardSelection = nil
+        pendingCardResult = nil
         codexBoostNextReward = false
     }
 
@@ -108,6 +134,7 @@ final class RunManager: ObservableObject {
         completeNode(interaction.nodeID, in: &state)
         runState = state
         pendingCampfire = nil
+        pendingCardResult = nil
     }
 
     func upgradeCardAtCampfire(_ cardID: UUID, interaction: CampfireInteraction) {
@@ -120,6 +147,11 @@ final class RunManager: ObservableObject {
         completeNode(interaction.nodeID, in: &state)
         runState = state
         pendingCampfire = nil
+        pendingCardResult = CardSelectionResult(
+            title: "Carte améliorée : \(state.player.deck[index].card.name)",
+            subtitle: "Le feu de camp renforce votre carte.",
+            card: state.player.deck[index].card
+        )
     }
 
     func buyRelic(offerID: UUID, from interaction: ShopInteraction) {
@@ -151,6 +183,10 @@ final class RunManager: ObservableObject {
         guard var state = runState else { return }
 
         var triggerEliteFight = false
+        var needsUpgradeSelection = false
+        var needsCardSelection = false
+        var cardRarity: Rarity?
+
         for effect in option.effects {
             switch effect {
             case .gainGold(let amount):
@@ -164,15 +200,14 @@ final class RunManager: ObservableObject {
             case .gainRelic:
                 grantRelic(randomRelic(), to: &state.player)
             case .gainCard(let rarity):
-                if let card = randomCard(rarity: rarity) {
-                    state.player.deck.append(RunCardInstance(card: card))
-                }
+                needsCardSelection = true
+                cardRarity = rarity
             case .removeCard:
                 if !state.player.deck.isEmpty {
                     state.player.deck.remove(at: Int.random(in: 0..<state.player.deck.count))
                 }
             case .upgradeCard:
-                upgradeRandomCard(in: &state.player.deck)
+                needsUpgradeSelection = true
             case .startEliteFight:
                 triggerEliteFight = true
             }
@@ -189,6 +224,50 @@ final class RunManager: ObservableObject {
             return
         }
 
+        if needsUpgradeSelection {
+            let upgradable = state.player.deck.filter { !$0.isUpgraded }
+            guard !upgradable.isEmpty else {
+                completeNode(interaction.nodeID, in: &state)
+                runState = state
+                pendingEvent = nil
+                return
+            }
+
+            runState = state
+            pendingEvent = nil
+            pendingCardSelection = CardSelectionInteraction(
+                nodeID: interaction.nodeID,
+                title: "Choisissez une carte à améliorer",
+                description: "Sélectionnez la carte que vous souhaitez améliorer.",
+                mode: .upgrade,
+                upgradableCards: upgradable,
+                cardChoices: []
+            )
+            return
+        }
+
+        if needsCardSelection {
+            let choices = randomCardChoices(rarity: cardRarity, count: 3)
+            guard !choices.isEmpty else {
+                completeNode(interaction.nodeID, in: &state)
+                runState = state
+                pendingEvent = nil
+                return
+            }
+
+            runState = state
+            pendingEvent = nil
+            pendingCardSelection = CardSelectionInteraction(
+                nodeID: interaction.nodeID,
+                title: "Choisissez une carte à ajouter",
+                description: "Cette carte sera ajoutée immédiatement à votre deck.",
+                mode: .addToDeck,
+                upgradableCards: [],
+                cardChoices: choices
+            )
+            return
+        }
+
         completeNode(interaction.nodeID, in: &state)
         runState = state
         pendingEvent = nil
@@ -196,6 +275,44 @@ final class RunManager: ObservableObject {
         if triggerEliteFight, let node = state.nodes.first(where: { $0.id == interaction.nodeID }) {
             startBattle(for: node, forceElite: true)
         }
+    }
+
+    func confirmPendingCardSelection(upgradeCardID: UUID? = nil, addCardID: UUID? = nil) {
+        guard let selection = pendingCardSelection,
+              var state = runState else { return }
+
+        switch selection.mode {
+        case .upgrade:
+            guard let upgradeCardID,
+                  let index = state.player.deck.firstIndex(where: { $0.id == upgradeCardID }),
+                  !state.player.deck[index].isUpgraded else { return }
+
+            state.player.deck[index].isUpgraded = true
+            state.player.deck[index].card = upgradedCard(from: state.player.deck[index].card)
+            pendingCardResult = CardSelectionResult(
+                title: "Carte améliorée : \(state.player.deck[index].card.name)",
+                subtitle: "Le pouvoir de l'événement a transformé votre carte.",
+                card: state.player.deck[index].card
+            )
+        case .addToDeck:
+            guard let addCardID,
+                  let card = selection.cardChoices.first(where: { $0.id == addCardID }) else { return }
+            state.player.deck.append(RunCardInstance(card: card))
+            pendingCardResult = CardSelectionResult(
+                title: "Carte ajoutée au deck : \(card.name)",
+                subtitle: "Votre deck s'enrichit d'une nouvelle carte.",
+                card: card
+            )
+        }
+
+        completeNode(selection.nodeID, in: &state)
+        runState = state
+        pendingCardSelection = nil
+
+    }
+
+    func dismissCardResult() {
+        pendingCardResult = nil
     }
 
     func dismissPendingNodeInteractions() {
@@ -278,6 +395,8 @@ final class RunManager: ObservableObject {
         pendingCampfire = nil
         pendingShop = nil
         pendingEvent = nil
+        pendingCardSelection = nil
+        pendingCardResult = nil
         codexBoostNextReward = false
         runState = state
     }
@@ -339,6 +458,16 @@ final class RunManager: ObservableObject {
             return pool.filter { $0.rarity == rarity }.randomElement() ?? pool.randomElement()
         }
         return pool.randomElement()
+    }
+
+    private func randomCardChoices(rarity: Rarity?, count: Int) -> [Card] {
+        let pool = CardsDB.commons + CardsDB.rituals + CardsDB.gods
+        let filteredPool = rarity.map { requested in
+            pool.filter { $0.rarity == requested }
+        } ?? pool
+
+        let base = filteredPool.isEmpty ? pool : filteredPool
+        return Array(base.shuffled().prefix(max(1, count)))
     }
 
     private func upgradeRandomCard(in deck: inout [RunCardInstance]) {

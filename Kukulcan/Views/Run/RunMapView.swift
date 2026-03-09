@@ -109,6 +109,22 @@ struct RunMapView: View {
                 runManager.chooseEventOption(option, in: interaction)
             }
         }
+        .sheet(item: $runManager.pendingCardSelection) { interaction in
+            CardSelectionSheet(
+                interaction: interaction,
+                onConfirmUpgrade: { cardID in
+                    runManager.confirmPendingCardSelection(upgradeCardID: cardID)
+                },
+                onConfirmAdd: { cardID in
+                    runManager.confirmPendingCardSelection(addCardID: cardID)
+                }
+            )
+        }
+        .sheet(item: $runManager.pendingCardResult) { result in
+            CardSelectionResultSheet(result: result) {
+                runManager.dismissCardResult()
+            }
+        }
         .fullScreenCover(item: $runManager.activeBattle) { battle in
             CombatView(
                 engine: GameEngine(
@@ -390,6 +406,8 @@ private struct CampfireChoiceSheet: View {
     let onHeal: () -> Void
     let onUpgrade: (UUID) -> Void
 
+    @State private var selectedCardID: UUID?
+
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
@@ -407,24 +425,126 @@ private struct CampfireChoiceSheet: View {
                     .font(.headline)
 
                 if let upgradableCards = player?.deck.filter({ !$0.isUpgraded }), !upgradableCards.isEmpty {
-                    List(upgradableCards) { instance in
-                        Button {
-                            onUpgrade(instance.id)
-                        } label: {
-                            HStack {
-                                Text(instance.card.name)
-                                Spacer()
-                                Text("ATK \(instance.card.attack) / HP \(instance.card.health)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                    CardSelectionGallery(
+                        cards: upgradableCards.map(\.card),
+                        selectedCardID: $selectedCardID
+                    )
+
+                    Button("Confirmer l'amélioration") {
+                        if let selectedCardID {
+                            onUpgrade(selectedCardID)
                         }
                     }
-                    .listStyle(.plain)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(selectedCardID == nil)
                 } else {
                     Text("Aucune carte améliorable disponible.")
                         .foregroundStyle(.secondary)
                 }
+            }
+            .padding()
+        }
+    }
+}
+
+private struct CardSelectionGallery: View {
+    let cards: [Card]
+    @Binding var selectedCardID: UUID?
+
+    private let cardWidth: CGFloat = 160
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 14) {
+                ForEach(cards, id: \.id) { card in
+                    let isSelected = selectedCardID == card.id
+                    CardView(card: card, faceUp: true, width: cardWidth) {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                            selectedCardID = card.id
+                        }
+                    }
+                    .scaleEffect(isSelected ? 1.06 : 0.96)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(isSelected ? Color.orange : Color.clear, lineWidth: 3)
+                            .shadow(color: isSelected ? .orange.opacity(0.8) : .clear, radius: 10)
+                    }
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 6)
+        }
+        .frame(height: cardWidth * 1.62)
+    }
+}
+
+private struct CardSelectionSheet: View {
+    let interaction: CardSelectionInteraction
+    let onConfirmUpgrade: (UUID) -> Void
+    let onConfirmAdd: (UUID) -> Void
+
+    @State private var selectedCardID: UUID?
+
+    private var cards: [Card] {
+        switch interaction.mode {
+        case .upgrade:
+            interaction.upgradableCards.map(\.card)
+        case .addToDeck:
+            interaction.cardChoices
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(interaction.title)
+                    .font(.title3.bold())
+                Text(interaction.description)
+                    .foregroundStyle(.secondary)
+
+                CardSelectionGallery(cards: cards, selectedCardID: $selectedCardID)
+
+                Button("Confirmer") {
+                    guard let selectedCardID else { return }
+                    switch interaction.mode {
+                    case .upgrade:
+                        onConfirmUpgrade(selectedCardID)
+                    case .addToDeck:
+                        onConfirmAdd(selectedCardID)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(selectedCardID == nil)
+
+                Spacer(minLength: 0)
+            }
+            .padding()
+        }
+    }
+}
+
+private struct CardSelectionResultSheet: View {
+    let result: CardSelectionResult
+    let onClose: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 18) {
+                Text(result.title)
+                    .font(.title3.bold())
+                    .multilineTextAlignment(.center)
+
+                Text(result.subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                CardView(card: result.card, faceUp: true, width: 210)
+
+                Button("Continuer") {
+                    onClose()
+                }
+                .buttonStyle(.borderedProminent)
             }
             .padding()
         }
