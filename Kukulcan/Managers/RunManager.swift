@@ -204,7 +204,12 @@ final class RunManager: ObservableObject {
                 cardRarity = rarity
             case .removeCard:
                 if !state.player.deck.isEmpty {
-                    state.player.deck.remove(at: Int.random(in: 0..<state.player.deck.count))
+                    let removed = state.player.deck.remove(at: Int.random(in: 0..<state.player.deck.count))
+                    pendingCardResult = CardSelectionResult(
+                        title: "Carte brûlée : \(removed.card.name)",
+                        subtitle: "Le rituel consume cette carte de votre deck.",
+                        card: removed.card
+                    )
                 }
             case .upgradeCard:
                 needsUpgradeSelection = true

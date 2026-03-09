@@ -426,7 +426,7 @@ private struct CampfireChoiceSheet: View {
 
                 if let upgradableCards = player?.deck.filter({ !$0.isUpgraded }), !upgradableCards.isEmpty {
                     CardSelectionGallery(
-                        cards: upgradableCards.map(\.card),
+                        cards: upgradableCards.map { .init(id: $0.id, card: $0.card) },
                         selectedCardID: $selectedCardID
                     )
 
@@ -448,7 +448,12 @@ private struct CampfireChoiceSheet: View {
 }
 
 private struct CardSelectionGallery: View {
-    let cards: [Card]
+    struct Item: Identifiable {
+        let id: UUID
+        let card: Card
+    }
+
+    let cards: [Item]
     @Binding var selectedCardID: UUID?
 
     private let cardWidth: CGFloat = 160
@@ -458,7 +463,7 @@ private struct CardSelectionGallery: View {
             HStack(spacing: 14) {
                 ForEach(cards, id: \.id) { card in
                     let isSelected = selectedCardID == card.id
-                    CardView(card: card, faceUp: true, width: cardWidth) {
+                    CardView(card: card.card, faceUp: true, width: cardWidth) {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
                             selectedCardID = card.id
                         }
@@ -485,12 +490,12 @@ private struct CardSelectionSheet: View {
 
     @State private var selectedCardID: UUID?
 
-    private var cards: [Card] {
+    private var cards: [CardSelectionGallery.Item] {
         switch interaction.mode {
         case .upgrade:
-            interaction.upgradableCards.map(\.card)
+            interaction.upgradableCards.map { .init(id: $0.id, card: $0.card) }
         case .addToDeck:
-            interaction.cardChoices
+            interaction.cardChoices.map { .init(id: $0.id, card: $0) }
         }
     }
 

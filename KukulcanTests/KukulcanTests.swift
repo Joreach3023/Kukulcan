@@ -225,8 +225,8 @@ struct KukulcanTests {
         #expect(action?.card.id == common.id)
     }
 
-    /// Le joueur qui commence ne peut pas attaquer pendant son premier tour.
-    @Test func firstPlayerCannotAttackOnFirstTurn() {
+    /// Le joueur qui commence peut attaquer normalement dès son premier tour.
+    @Test func firstPlayerCanAttackOnFirstTurn() {
         let fighter = Card(name: "Guerrier", type: .common, rarity: .common,
                            imageName: "", attack: 2, health: 2, effect: "")
         var p1 = PlayerState(name: "P1")
@@ -236,7 +236,7 @@ struct KukulcanTests {
         let engine = GameEngine(p1: p1, p2: p2)
         engine.attack(from: 0, to: .player)
 
-        #expect(engine.p2.hp == 10)
+        #expect(engine.p2.hp == 8)
     }
 
     /// Le joueur qui ne commence pas peut attaquer normalement à son premier tour.
@@ -254,8 +254,8 @@ struct KukulcanTests {
         #expect(engine.p1.hp == 8)
     }
 
-    /// Le setup de partie pose automatiquement des communes pour les deux joueurs.
-    @Test func startAutoDeploysOpeningCommonsForBothPlayers() {
+    /// Le setup de partie démarre avec un board vide pour les deux joueurs.
+    @Test func startInitializesWithEmptyBoardsForBothPlayers() {
         let common = Card(name: "Soldat", type: .common, rarity: .common,
                           imageName: "", attack: 1, health: 1, effect: "")
         var p1 = PlayerState(name: "P1")
@@ -266,8 +266,8 @@ struct KukulcanTests {
         let engine = GameEngine(p1: p1, p2: p2)
         engine.start(mulligan: 5)
 
-        #expect(engine.p1.board.compactMap { $0 }.count == 3)
-        #expect(engine.p2.board.compactMap { $0 }.count == 3)
+        #expect(engine.p1.board.compactMap { $0 }.isEmpty)
+        #expect(engine.p2.board.compactMap { $0 }.isEmpty)
     }
 
     /// Un dieu tué pendant un échange contre un autre dieu ne doit pas réapparaître.

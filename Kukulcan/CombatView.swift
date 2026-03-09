@@ -436,11 +436,11 @@ struct CombatView: View {
                 }
             }
             ToolbarItemGroup(placement: .navigationBarTrailing) {
-                Button("Fin du tour") {
+                Button("Finir le tour") {
                     endPlayerTurnAndRunEnemySequence()
                 }
                 .disabled(!isPlayerInteractionEnabled)
-                Button("Quitter") {
+                Button("Terminer la partie") {
                     quitCombat()
                 }
             }
@@ -1806,4 +1806,3 @@ private extension CGRect {
         CGPoint(x: midX, y: midY)
     }
 }
-

@@ -133,12 +133,7 @@ final class GameEngine: ObservableObject {
 
     var current: PlayerState { currentPlayerIsP1 ? p1 : p2 }
     var opponent: PlayerState { currentPlayerIsP1 ? p2 : p1 }
-    var canCurrentPlayerAttack: Bool {
-        if currentPlayerIsP1 == startingPlayerIsP1 {
-            return currentPlayerIsP1 ? p1CompletedTurns > 0 : p2CompletedTurns > 0
-        }
-        return true
-    }
+    var canCurrentPlayerAttack: Bool { true }
 
     init(p1: PlayerState, p2: PlayerState) {
         self.p1 = p1; self.p2 = p2
@@ -146,25 +141,20 @@ final class GameEngine: ObservableObject {
 
     // MARK: setup
     func start(mulligan: Int = 5) {
-        // Réinitialise les zones et ressources pour les deux joueurs
-        p1.sacrificeSlot = nil; p1.godSlot = nil
-        p2.sacrificeSlot = nil; p2.godSlot = nil
-        p1.blood = 0; p1.pendingBonusBlood = 0
-        p2.blood = 0; p2.pendingBonusBlood = 0
+        // Réinitialise intégralement les états de combat pour éviter toute fuite d'une partie précédente.
+        p1 = sanitizedStateForNewCombat(from: p1)
+        p2 = sanitizedStateForNewCombat(from: p2)
 
         // Mélange très simple
         p1.deck.shuffle(); p2.deck.shuffle()
         _ = p1.draw(mulligan); _ = p2.draw(mulligan)
-        autoDeployOpeningCommons(forP1: true)
-        autoDeployOpeningCommons(forP1: false)
         startingPlayerIsP1 = Bool.random()
         currentPlayerIsP1 = startingPlayerIsP1
         p1CompletedTurns = 0
         p2CompletedTurns = 0
         log.removeAll()
-        log.append("La partie commence après la pose initiale des cartes.")
+        log.append("La partie commence avec un plateau vide des deux côtés.")
         log.append("\(activeName()) joue en premier (tirage 50/50).")
-        log.append("Règle d'ouverture: le joueur qui commence ne peut pas attaquer à son premier tour.")
     }
 
     // MARK: actions (joueur courant)
@@ -285,11 +275,6 @@ final class GameEngine: ObservableObject {
 
     /// Attaque depuis un slot du board courant (ou le dieu si slot = -1) vers une cible
     func attack(from slot: Int, to target: Target) {
-        guard canCurrentPlayerAttack else {
-            log.append("\(activeName()) ne peut pas attaquer pendant son premier tour.")
-            return
-        }
-
         var atkOwner = current
         var defOwner = opponent
 
@@ -415,6 +400,27 @@ final class GameEngine: ObservableObject {
             p2.sacrificeSlot = nil
             p2.pendingBonusBlood = 0
         }
+    }
+
+    private func sanitizedStateForNewCombat(from source: PlayerState) -> PlayerState {
+        let allCards = source.deck
+            + source.hand
+            + source.discard
+            + source.board.compactMap { $0?.base }
+            + [source.sacrificeSlot?.base, source.godSlot?.base].compactMap { $0 }
+
+        return PlayerState(
+            name: source.name,
+            hp: source.hp,
+            deck: allCards,
+            hand: [],
+            discard: [],
+            board: Array(repeating: nil, count: 3),
+            sacrificeSlot: nil,
+            godSlot: nil,
+            blood: 0,
+            pendingBonusBlood: 0
+        )
     }
 
     // MARK: - Helpers mutateurs
