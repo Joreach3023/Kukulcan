@@ -270,4 +270,26 @@ struct KukulcanTests {
         #expect(engine.p2.board.compactMap { $0 }.count == 3)
     }
 
+    /// Un dieu tué pendant un échange contre un autre dieu ne doit pas réapparaître.
+    @Test func deadDefendingGodIsNotRestoredAfterGodCombat() {
+        var p1 = PlayerState(name: "P1")
+        var p2 = PlayerState(name: "P2")
+
+        let attackerGod = Card(name: "Attaquant", type: .god, rarity: .legendary,
+                               imageName: "", attack: 4, health: 2, bloodCost: 0, effect: "")
+        let defenderGod = Card(name: "Défenseur", type: .god, rarity: .legendary,
+                               imageName: "", attack: 2, health: 3, bloodCost: 0, effect: "")
+
+        p1.godSlot = CardInstance(attackerGod)
+        p2.godSlot = CardInstance(defenderGod)
+
+        let engine = GameEngine(p1: p1, p2: p2)
+        engine.endTurn()
+        engine.endTurn()
+        engine.attack(from: -1, to: .god)
+
+        #expect(engine.p2.godSlot == nil)
+        #expect(engine.p2.discard.contains(where: { $0.id == defenderGod.id }))
+    }
+
 }
