@@ -122,6 +122,9 @@ struct CombatView: View {
     @State private var enemyActionCard: Card? = nil
     @State private var enemyAttackPulse = false
     @State private var enemyAttackLineVisible = false
+    @State private var enemySlotFrames: [Int: CGRect] = [:]
+    @State private var enemyGodFrame: CGRect = .zero
+    @State private var enemySacrificeFrame: CGRect = .zero
     @State private var combatShakeOffset: CGSize = .zero
     @State private var isShakingCombat = false
     @State private var incomingDamageFlash: Double = 0
@@ -130,6 +133,9 @@ struct CombatView: View {
     @State private var ritualInProgress = false
     @State private var ritualTintColor: Color = .cyan
     @State private var damagePopups: [DamagePopup] = []
+    @State private var enemyPlayFlight: EnemyPlayFlight? = nil
+    @State private var enemyPlayProgress: CGFloat = 0
+    @State private var isEnemyPlayAnimating = false
 
     // Drag & drop depuis la main vers le board
     @State private var draggingCardIndex: Int? = nil
@@ -160,6 +166,12 @@ struct CombatView: View {
     private var combatSceneHorizontalPadding: CGFloat { isCompactPortrait ? 12 : 10 }
     private let combatRowSpacing: CGFloat = 10
     private var combatContentWidth: CGFloat { (slotCardWidth * 4) + (combatRowSpacing * 3) }
+
+    private struct EnemyPlayFlight {
+        let card: Card
+        let start: CGPoint
+        let end: CGPoint
+    }
 
     private var enemyAIConfiguration: EnemyAI.Configuration {
         switch aiLevel {
@@ -277,16 +289,17 @@ struct CombatView: View {
                 VStack(spacing: 8) {
                     header
 
-                    // Plateau adverse miroité
-                    opponentBoard
+                    enemyHandStrip
+
+                    // Côté adverse: Dieux/Sacrifices derrière l'armée
+                    opponentZonesRow
+                    opponentBoardArea
                         .scaleEffect(enemyHitBounce)
 
-                    Spacer(minLength: 2)
+                    battleLine
 
-                    // Board du joueur (3 slots)
+                    // Côté joueur: armée devant Dieux/Sacrifices
                     boardArea
-
-                    // Zone Dieu + Sacrifice + Défausse
                     zonesRow
 
                     Spacer(minLength: 0)
@@ -322,6 +335,13 @@ struct CombatView: View {
                 if isEnemyDrawAnimating {
                     EnemyDrawFlightView(progress: enemyDrawProgress, start: CGPoint(x: enemyDeckFrame.midX, y: enemyDeckFrame.midY), end: CGPoint(x: enemyHandFrame.midX, y: enemyHandFrame.midY), width: deckCardWidth)
                         .zIndex(3)
+                        .allowsHitTesting(false)
+                }
+
+                if let flight = enemyPlayFlight, isEnemyPlayAnimating {
+                    DrawFlyingCardView(card: flight.card, progress: enemyPlayProgress, start: flight.start, end: flight.end, width: handCardWidth * 0.8)
+                        .rotationEffect(.degrees(180))
+                        .zIndex(4)
                         .allowsHitTesting(false)
                 }
 
@@ -505,20 +525,47 @@ struct CombatView: View {
         .background(.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 14))
     }
 
-    // MARK: - Plateau adverse (miroir vertical)
-    private var opponentBoard: some View {
+    // MARK: - Plateau adverse (miroir joueur/adversaire)
+    private var enemyHandStrip: some View {
         VStack(spacing: 6) {
-            opponentZonesRow
-            opponentBoardArea
+            Text("Main adverse")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.black.opacity(0.26))
+
+                HStack(spacing: -deckCardWidth * 0.58) {
+                    ForEach(0..<max(1, min(enemyState.hand.count, 6)), id: \.self) { idx in
+                        if enemyState.hand.isEmpty {
+                            Text("0")
+                                .font(.caption.bold())
+                                .foregroundStyle(.white)
+                        } else {
+                            CardBackView(width: deckCardWidth * 0.72)
+                                .rotationEffect(.degrees(180))
+                                .offset(y: idx.isMultiple(of: 2) ? -1 : 1)
+                        }
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+            .frame(width: combatContentWidth, height: deckCardHeight * 0.72)
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear { enemyHandFrame = geo.frame(in: .named("combatArea")) }
+                        .onChange(of: geo.frame(in: .named("combatArea"))) { _, frame in enemyHandFrame = frame }
+                }
+            )
         }
-        .rotationEffect(.degrees(180))
+        .padding(.top, 2)
     }
 
     private var opponentBoardArea: some View {
         VStack(spacing: 6) {
             HStack(spacing: combatRowSpacing) {
-                // `opponentBoard` est retourné à 180°: le slot fantôme doit être
-                // placé en tête pour rester visuellement à droite après rotation.
                 Color.clear
                     .frame(width: slotCardWidth, height: slotCardHeight)
 
@@ -526,15 +573,86 @@ struct CombatView: View {
                     let inst = enemyState.board[i]
                     slotView(for: inst?.base, hp: inst?.currentHP)
                         .rotationEffect(.degrees(180))
+                        .background(
+                            GeometryReader { geo in
+                                let frame = geo.frame(in: .named("combatArea"))
+                                Color.clear
+                                    .onAppear { enemySlotFrames[i] = frame }
+                                    .onChange(of: frame) { _, newFrame in enemySlotFrames[i] = newFrame }
+                            }
+                        )
                 }
             }
             .frame(width: combatContentWidth, alignment: .leading)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 8)
+        .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 14))
     }
 
     private var opponentZonesRow: some View {
         HStack(spacing: combatRowSpacing) {
             VStack(spacing: 6) {
+                Text("Défausse IA")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                ZStack {
+                    emptySlot(width: slotCardWidth, height: slotCardHeight)
+                    if !enemyState.discard.isEmpty {
+                        Text("\(enemyState.discard.count)")
+                            .font(.headline.bold())
+                            .padding(8)
+                            .background(Circle().fill(.black.opacity(0.6)))
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+
+            VStack(spacing: 6) {
+                Text("Dieu adverse")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                slotView(for: enemyState.godSlot?.base, hp: enemyState.godSlot?.currentHP)
+                    .rotationEffect(.degrees(180))
+                    .frame(width: slotCardWidth, height: slotCardHeight)
+                    .background(
+                        GeometryReader { geo in
+                            let frame = geo.frame(in: .named("combatArea"))
+                            Color.clear
+                                .onAppear { enemyGodFrame = frame }
+                                .onChange(of: frame) { _, newFrame in enemyGodFrame = newFrame }
+                        }
+                    )
+            }
+
+            VStack(spacing: 6) {
+                Text("Sacrifice IA")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                ZStack {
+                    if let inst = enemyState.sacrificeSlot {
+                        CardView(card: inst.base, faceUp: true, width: slotCardWidth)
+                            .rotationEffect(.degrees(180))
+                    } else {
+                        emptySlot(width: slotCardWidth, height: slotCardHeight)
+                    }
+                }
+                .frame(width: slotCardWidth, height: slotCardHeight)
+                .background(
+                    GeometryReader { geo in
+                        let frame = geo.frame(in: .named("combatArea"))
+                        Color.clear
+                            .onAppear { enemySacrificeFrame = frame }
+                            .onChange(of: frame) { _, newFrame in enemySacrificeFrame = newFrame }
+                    }
+                )
+            }
+
+            VStack(spacing: 6) {
+                Text("Pioche IA")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 ZStack {
                     if enemyState.deck.isEmpty {
                         emptySlot(width: deckCardWidth, height: deckCardHeight)
@@ -543,7 +661,6 @@ struct CombatView: View {
                         Text("\(enemyState.deck.count)")
                             .font(.headline.bold())
                             .foregroundStyle(.white)
-                            .rotationEffect(.degrees(180))
                     }
                 }
                 .background(
@@ -554,56 +671,22 @@ struct CombatView: View {
                     }
                 )
             }
-
-            VStack(spacing: 6) {
-                Text("Main IA")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .rotationEffect(.degrees(180))
-                ZStack(alignment: .center) {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.white.opacity(0.16))
-                        .frame(width: deckCardWidth + 8, height: deckCardHeight + 8)
-
-                    if enemyState.hand.isEmpty {
-                        Text("0")
-                            .font(.caption.bold())
-                            .foregroundStyle(.white)
-                            .rotationEffect(.degrees(180))
-                    } else {
-                        HStack(spacing: -deckCardWidth * 0.65) {
-                            ForEach(0..<min(enemyState.hand.count, 4), id: \.self) { _ in
-                                CardBackView(width: deckCardWidth * 0.68)
-                                    .rotationEffect(.degrees(180))
-                            }
-                        }
-                    }
-                }
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear
-                                .onAppear { enemyHandFrame = geo.frame(in: .named("combatArea")) }
-                                .onChange(of: geo.frame(in: .named("combatArea"))) { _, frame in enemyHandFrame = frame }
-                        }
-                    )
-            }
-
-            VStack(spacing: 6) {
-                slotView(for: enemyState.godSlot?.base, hp: enemyState.godSlot?.currentHP)
-                    .rotationEffect(.degrees(180))
-                    .frame(width: slotCardWidth, height: slotCardHeight)
-            }
-
-            VStack(spacing: 6) {
-                if let inst = enemyState.sacrificeSlot {
-                    CardView(card: inst.base, faceUp: true, width: slotCardWidth)
-                        .rotationEffect(.degrees(180))
-                } else {
-                    emptySlot(width: slotCardWidth, height: slotCardHeight)
-                }
-            }
         }
         .frame(width: combatContentWidth, alignment: .leading)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 8)
+        .background(.black.opacity(0.24), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var battleLine: some View {
+        HStack(spacing: 10) {
+            Rectangle().fill(.white.opacity(0.25)).frame(height: 1)
+            Text("VS")
+                .font(.caption.bold())
+                .foregroundStyle(.white.opacity(0.85))
+            Rectangle().fill(.white.opacity(0.25)).frame(height: 1)
+        }
+        .padding(.horizontal, 10)
     }
 
     // MARK: - Board du joueur
@@ -1060,11 +1143,17 @@ struct CombatView: View {
         turnPhase = .enemyPlaying
         if let action = chooseEnemyAction() {
             enemyActionCard = action.card
-            let didExecute = action.execute(on: engine)
-            if !didExecute {
-                enemyActionCard = nil
+
+            let playDuration = animateEnemyPlayCard(action)
+            DispatchQueue.main.asyncAfter(deadline: .now() + playDuration * 0.72) {
+                let didExecute = action.execute(on: engine)
+                if !didExecute {
+                    enemyActionCard = nil
+                }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + enemyTurnStepDelay) {
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + max(enemyTurnStepDelay, playDuration + 0.25)) {
+                enemyActionCard = nil
                 completion()
             }
         } else {
@@ -1129,6 +1218,48 @@ struct CombatView: View {
             isEnemyDrawAnimating = false
             enemyDrawProgress = 0
         }
+    }
+
+
+    private func animateEnemyPlayCard(_ action: EnemyAction) -> TimeInterval {
+        let destination: CGPoint
+        switch action.target {
+        case .board(let slot):
+            let mirrored = max(0, enemyState.board.count - 1 - slot)
+            destination = enemySlotFrames[mirrored]?.center ?? CGPoint(x: enemyHandFrame.midX, y: enemyHandFrame.midY + 120)
+        case .god:
+            destination = enemyGodFrame.center
+        case .sacrifice:
+            destination = enemySacrificeFrame.center
+        case .none:
+            destination = CGPoint(x: enemyHandFrame.midX, y: enemyHandFrame.midY + 120)
+        }
+
+        guard enemyHandFrame != .zero else { return 0.65 }
+
+        enemyPlayFlight = EnemyPlayFlight(
+            card: action.card,
+            start: CGPoint(x: enemyHandFrame.midX, y: enemyHandFrame.midY),
+            end: destination
+        )
+        isEnemyPlayAnimating = true
+        enemyPlayProgress = 0
+
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+        AudioServicesPlaySystemSound(1104)
+
+        withAnimation(.timingCurve(0.2, 0.92, 0.22, 1, duration: 0.78)) {
+            enemyPlayProgress = 1
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.84) {
+            isEnemyPlayAnimating = false
+            enemyPlayProgress = 0
+            enemyPlayFlight = nil
+        }
+
+        return 0.78
     }
 
     private func chooseEnemyAction() -> EnemyAction? {
@@ -1668,3 +1799,11 @@ private struct HandCardFramePreferenceKey: PreferenceKey {
         value.merge(nextValue()) { _, new in new }
     }
 }
+
+
+private extension CGRect {
+    var center: CGPoint {
+        CGPoint(x: midX, y: midY)
+    }
+}
+

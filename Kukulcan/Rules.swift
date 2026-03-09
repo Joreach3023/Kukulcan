@@ -533,11 +533,20 @@ struct EnemyAI {
     }
 
     struct PlannedAction {
+        enum PlacementTarget {
+            case board(slot: Int)
+            case god
+            case sacrifice
+            case none
+        }
+
         let card: Card
+        let target: PlacementTarget
         private let executeImpl: (GameEngine) -> Bool
 
-        init(card: Card, execute: @escaping (GameEngine) -> Bool) {
+        init(card: Card, target: PlacementTarget = .none, execute: @escaping (GameEngine) -> Bool) {
             self.card = card
+            self.target = target
             self.executeImpl = execute
         }
 
@@ -708,7 +717,19 @@ extension EnemyAI {
     }
 
     private func plannedAction(for candidate: ActionCandidate) -> PlannedAction {
-        PlannedAction(card: candidate.card) { engine in
+        let target: PlannedAction.PlacementTarget
+        switch candidate.kind {
+        case .playCommon(let slot):
+            target = .board(slot: slot)
+        case .invokeGod:
+            target = .god
+        case .sacrificeCommon:
+            target = .sacrifice
+        case .playRitual:
+            target = .none
+        }
+
+        return PlannedAction(card: candidate.card, target: target) { engine in
             guard let currentHandIndex = engine.current.hand.firstIndex(where: { $0.id == candidate.card.id }) else {
                 return false
             }
