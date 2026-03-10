@@ -360,6 +360,7 @@ final class RunManager: ObservableObject {
             }
 
             if node.type == .boss {
+                state.player.gold += 100
                 state.status = .victory
                 runState = state
                 activeBattle = nil
@@ -381,6 +382,11 @@ final class RunManager: ObservableObject {
         switch reward {
         case .card(let card):
             state.player.deck.append(RunCardInstance(card: card))
+            pendingCardResult = CardSelectionResult(
+                title: "Carte gagnée : \(card.name)",
+                subtitle: "Cette carte a été ajoutée à votre deck après le combat.",
+                card: card
+            )
         case .gold(let amount):
             state.player.gold += amount
         case .heal(let amount):

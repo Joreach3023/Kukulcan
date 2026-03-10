@@ -166,6 +166,7 @@ struct CombatView: View {
     private var combatSceneHorizontalPadding: CGFloat { isCompactPortrait ? 12 : 10 }
     private let combatRowSpacing: CGFloat = 10
     private var combatContentWidth: CGFloat { (slotCardWidth * 4) + (combatRowSpacing * 3) }
+    private var boardLiftPadding: CGFloat { isCompactPortrait ? handCardHeight * 0.52 : handCardHeight * 0.42 }
 
     private struct EnemyPlayFlight {
         let card: Card
@@ -302,7 +303,7 @@ struct CombatView: View {
                     boardArea
                     zonesRow
 
-                    Spacer(minLength: 0)
+                    Spacer(minLength: boardLiftPadding)
                 }
                 .frame(maxWidth: 560, maxHeight: .infinity, alignment: .center)
                 .padding(.horizontal, combatSceneHorizontalPadding)
@@ -428,6 +429,23 @@ struct CombatView: View {
                 .padding(.bottom, 10)
                 .allowsHitTesting(isPlayerInteractionEnabled)
                 .opacity(isPlayerInteractionEnabled ? 1 : 0.7)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            Button {
+                endPlayerTurnAndRunEnemySequence()
+            } label: {
+                Label("Passer le tour", systemImage: "forward.end.fill")
+                    .font(.caption.bold())
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.black.opacity(0.7), in: Capsule())
+            }
+            .tint(.white)
+            .buttonStyle(.plain)
+            .disabled(!isPlayerInteractionEnabled)
+            .opacity(isPlayerInteractionEnabled ? 1 : 0.55)
+            .padding(.trailing, 14)
+            .padding(.bottom, isCompactPortrait ? handCardHeight + 26 : handCardHeight + 18)
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
