@@ -13,7 +13,13 @@ protocol ObservableObject {}
 
 enum Rarity: String, Codable { case common, rare, epic, legendary }
 
-enum CardType: String, Codable { case common, ritual, god }
+enum CardType: String, Codable { case common, ritual, god, curse }
+
+enum BossType: String, Codable {
+    case ahPuch
+    case chaac
+    case kukulkan
+}
 
 /// Rituels pré-définis (tu pourras en ajouter facilement)
 enum RitualKind: String, Codable {
@@ -72,13 +78,23 @@ struct CardInstance: Identifiable, Codable, Hashable {
     var currentHP: Int
     var currentAttack: Int
     var hasActedThisTurn: Bool
+    var silencedTurns: Int
+    var isResurrected: Bool
 
-    init(_ card: Card, id: UUID = UUID(), currentHP: Int? = nil, currentAttack: Int? = nil, hasActedThisTurn: Bool = false) {
+    init(_ card: Card,
+         id: UUID = UUID(),
+         currentHP: Int? = nil,
+         currentAttack: Int? = nil,
+         hasActedThisTurn: Bool = false,
+         silencedTurns: Int = 0,
+         isResurrected: Bool = false) {
         self.id = id
         self.base = card
         self.currentHP = currentHP ?? max(1, card.health)
         self.currentAttack = currentAttack ?? card.attack
         self.hasActedThisTurn = hasActedThisTurn
+        self.silencedTurns = silencedTurns
+        self.isResurrected = isResurrected
     }
 }
 
@@ -134,16 +150,60 @@ final class GameEngine: ObservableObject {
     private var p1RelicIDs: Set<String> = []
     private var p1AttackCounter: Int = 0
 
+    let bossType: BossType?
+    @Published private(set) var playerNextCardCostsPlus1: Bool = false
+    @Published private(set) var playerCardsPlayedThisTurn: Int = 0
+    @Published private(set) var playerCardPlayLimit: Int? = nil
+    @Published private(set) var playerDidSacrificeThisTurn: Bool = false
+    @Published private(set) var combatBannerMessage: String? = nil
+
+    private var ahPuchCursesCreated: Int = 0
+    private var ahPuchResurrections: Int = 0
+    private var ahPuchDeadAllies: [CardInstance] = []
+    private var chaacSacredStormTriggered: Bool = false
+    private var chaacLastPlayedUnitID: UUID? = nil
+    private var condemnedUnitID: UUID? = nil
+
     var current: PlayerState { currentPlayerIsP1 ? p1 : p2 }
     var opponent: PlayerState { currentPlayerIsP1 ? p2 : p1 }
     var canCurrentPlayerAttack: Bool { true }
 
-    init(p1: PlayerState, p2: PlayerState) {
-        self.p1 = p1; self.p2 = p2
+    init(p1: PlayerState, p2: PlayerState, bossType: BossType? = nil) {
+        self.p1 = p1
+        self.p2 = p2
+        self.bossType = bossType
     }
 
     func configurePlayerRelics(_ relicIDs: [String]) {
         p1RelicIDs = Set(relicIDs)
+    }
+
+    private func isBossTurn() -> Bool {
+        currentPlayerIsP1 == false && bossType != nil
+    }
+
+    private func bossTurnCount() -> Int {
+        p2CompletedTurns + (currentPlayerIsP1 ? 0 : 1)
+    }
+
+    private func playerTurnCount() -> Int {
+        p1CompletedTurns + (currentPlayerIsP1 ? 1 : 0)
+    }
+
+    private func curseCard() -> Card {
+        Card(
+            name: "Malédiction",
+            type: .curse,
+            rarity: .common,
+            imageName: "danse_macabre",
+            effect: "Ne fait rien. Détruite: votre prochaine carte coûte +1 sang.",
+            lore: "Le souffle d’Ah Puch alourdit chaque offrande."
+        )
+    }
+
+    private func announce(_ text: String) {
+        combatBannerMessage = text
+        log.append(text)
     }
 
     // MARK: setup
@@ -160,9 +220,23 @@ final class GameEngine: ObservableObject {
         p1CompletedTurns = 0
         p2CompletedTurns = 0
         p1AttackCounter = 0
+        playerNextCardCostsPlus1 = false
+        playerCardsPlayedThisTurn = 0
+        playerCardPlayLimit = bossType == .kukulkan ? 3 : nil
+        playerDidSacrificeThisTurn = false
+        combatBannerMessage = nil
+        ahPuchCursesCreated = 0
+        ahPuchResurrections = 0
+        ahPuchDeadAllies.removeAll()
+        chaacSacredStormTriggered = false
+        chaacLastPlayedUnitID = nil
+        condemnedUnitID = nil
         log.removeAll()
         log.append("La partie commence avec un plateau vide des deux côtés.")
         applyPlayerStartOfCombatRelics()
+        if !currentPlayerIsP1 {
+            applyStartOfTurnBossEffectsIfNeeded()
+        }
         log.append("\(activeName()) joue en premier (tirage 50/50).")
     }
 
@@ -174,8 +248,10 @@ final class GameEngine: ObservableObject {
         guard handIndex < cp.hand.count else { return }
         let c = cp.hand[handIndex]
         guard c.type == .common else { return }
+        guard canPlayCardManually(card: c, owner: cp) else { return }
         guard cp.board[slot] == nil else { return } // slot libre
         cp.hand.remove(at: handIndex)
+        applyManualPlayCostAndCounters(card: c, owner: &cp)
         var instance = CardInstance(c)
 
         if p1RelicIDs.contains("ceremonialDrum"), currentPlayerIsP1 {
@@ -187,6 +263,9 @@ final class GameEngine: ObservableObject {
         }
 
         cp.board[slot] = instance
+        if !currentPlayerIsP1 {
+            chaacLastPlayedUnitID = instance.id
+        }
         setCurrent(cp, log: "\(activeName()) pose \(c.name) sur l’emplacement \(slot+1).")
 
         if c.name == "Jeune chasseur" {
@@ -201,8 +280,11 @@ final class GameEngine: ObservableObject {
         guard handIndex < cp.hand.count else { return }
         let c = cp.hand[handIndex]
         guard c.type == .common else { return }
+        guard canPlayCardManually(card: c, owner: cp) else { return }
 
         cp.hand.remove(at: handIndex)
+        applyManualPlayCostAndCounters(card: c, owner: &cp)
+        if currentPlayerIsP1 { playerDidSacrificeThisTurn = true }
         let inst = CardInstance(c)
         cp.sacrificeSlot = inst
         // Gain de blood
@@ -228,7 +310,13 @@ final class GameEngine: ObservableObject {
         guard handIndex < cp.hand.count else { return }
         let c = cp.hand[handIndex]
         guard c.type == .ritual, let kind = c.ritual else { return }
+        guard canPlayCardManually(card: c, owner: cp) else { return }
+        if let s = targetSlot, s >= 0, s < cp.board.count, let inst = cp.board[s], inst.silencedTurns > 0 {
+            log.append("Unité réduite au silence : rituel impossible ce tour.")
+            return
+        }
         cp.hand.remove(at: handIndex)
+        applyManualPlayCostAndCounters(card: c, owner: &cp)
 
         switch kind {
         case .obsidianKnife:
@@ -240,6 +328,7 @@ final class GameEngine: ObservableObject {
                 cp.pendingBonusBlood = 0
                 cp.sacrificeSlot = inst
                 cp.discard.append(inst.base)
+                if currentPlayerIsP1 { playerDidSacrificeThisTurn = true }
                 cp.discard.append(c)
                 setCurrent(cp, log: "\(activeName()) utilise Couteau d’obsidienne sur \(inst.base.name) → +\(gain) Sang (total \(cp.blood)).")
                 // pioche 2
@@ -275,10 +364,10 @@ final class GameEngine: ObservableObject {
         guard handIndex < cp.hand.count else { return }
         let c = cp.hand[handIndex]
         guard c.type == .god, cp.godSlot == nil else { return }
-        guard cp.blood >= c.bloodCost else { return }
+        guard canPlayCardManually(card: c, owner: cp) else { return }
 
         cp.hand.remove(at: handIndex)
-        cp.blood -= c.bloodCost
+        applyManualPlayCostAndCounters(card: c, owner: &cp)
         var god = CardInstance(c)
         if p1RelicIDs.contains("ceremonialDrum"), currentPlayerIsP1 {
             god.currentAttack += 1
@@ -296,7 +385,7 @@ final class GameEngine: ObservableObject {
                     if inst.currentHP <= 0 {
                         op.discard.append(inst.base)
                         op.board[i] = nil
-                        triggerDeathEffects(for: inst.base, owner: &op)
+                        triggerDeathEffects(for: inst, ownerIsP1: currentPlayerIsP1 ? false : true, owner: &op)
                     } else {
                         op.board[i] = inst
                     }
@@ -309,6 +398,50 @@ final class GameEngine: ObservableObject {
             setCurrent(cp, log: "\(activeName()) invoque \(c.name) (coût \(c.bloodCost) Sang).")
         default:
             setCurrent(cp, log: "\(activeName()) invoque \(c.name) (coût \(c.bloodCost) Sang).")
+        }
+    }
+
+    func playCurse(handIndex: Int) {
+        var cp = current
+        guard handIndex < cp.hand.count else { return }
+        let c = cp.hand[handIndex]
+        guard c.type == .curse else { return }
+        guard canPlayCardManually(card: c, owner: cp) else { return }
+
+        cp.hand.remove(at: handIndex)
+        applyManualPlayCostAndCounters(card: c, owner: &cp)
+        cp.discard.append(c)
+        if currentPlayerIsP1 {
+            playerNextCardCostsPlus1 = true
+        }
+        setCurrent(cp, log: "\(activeName()) joue Malédiction. La prochaine carte coûte +1 Sang.")
+    }
+
+    private func canPlayCardManually(card: Card, owner: PlayerState) -> Bool {
+        if currentPlayerIsP1, let limit = playerCardPlayLimit, playerCardsPlayedThisTurn >= limit {
+            announce("Loi du temple : 3 cartes max par tour.")
+            return false
+        }
+
+        var totalCost = card.bloodCost
+        if currentPlayerIsP1 && playerNextCardCostsPlus1 { totalCost += 1 }
+        if owner.blood < totalCost {
+            return false
+        }
+
+        return true
+    }
+
+    private func applyManualPlayCostAndCounters(card: Card, owner: inout PlayerState) {
+        var totalCost = card.bloodCost
+        if currentPlayerIsP1 && playerNextCardCostsPlus1 {
+            totalCost += 1
+            playerNextCardCostsPlus1 = false
+        }
+        owner.blood = max(0, owner.blood - totalCost)
+
+        if currentPlayerIsP1 {
+            playerCardsPlayedThisTurn += 1
         }
     }
 
@@ -367,7 +500,7 @@ final class GameEngine: ObservableObject {
                 } else {
                     atkOwner.discard.append(atker.base)
                     atkOwner.board[slot] = nil
-                    triggerDeathEffects(for: atker.base, owner: &atkOwner)
+                    triggerDeathEffects(for: atker, ownerIsP1: currentPlayerIsP1, owner: &atkOwner)
                 }
             } else {
                 assignBackAttacker()
@@ -392,7 +525,7 @@ final class GameEngine: ObservableObject {
             if def.currentHP <= 0 {
                 defOwner.discard.append(def.base)
                 defOwner.board[i] = nil
-                triggerDeathEffects(for: def.base, owner: &defOwner)
+                triggerDeathEffects(for: def, ownerIsP1: !currentPlayerIsP1, owner: &defOwner)
 
                 if atker.base.name == "Archer maladroit" {
                     drawForCurrent(1)
@@ -409,7 +542,7 @@ final class GameEngine: ObservableObject {
                 } else {
                     atkOwner.discard.append(atker.base)
                     atkOwner.board[slot] = nil
-                    triggerDeathEffects(for: atker.base, owner: &atkOwner)
+                    triggerDeathEffects(for: atker, ownerIsP1: currentPlayerIsP1, owner: &atkOwner)
                 }
             } else {
                 assignBackAttacker()
@@ -440,7 +573,7 @@ final class GameEngine: ObservableObject {
                     if inst.currentHP <= 0 {
                         p2.discard.append(inst.base)
                         p2.board[i] = nil
-                        triggerDeathEffects(for: inst.base, owner: &p2)
+                        triggerDeathEffects(for: inst, ownerIsP1: false, owner: &p2)
                     } else {
                         p2.board[i] = inst
                     }
@@ -460,21 +593,51 @@ final class GameEngine: ObservableObject {
         }
     }
 
-    private func triggerDeathEffects(for card: Card, owner: inout PlayerState) {
-        switch card.name {
+    private func triggerDeathEffects(for instance: CardInstance, ownerIsP1: Bool, owner: inout PlayerState) {
+        switch instance.base.name {
         case "Prisonnier captif":
             owner.blood += 1
         case "Prophète délirant":
-            if owner.deck.isEmpty { return }
-            let drawn = owner.deck.removeFirst()
-            owner.hand.append(drawn)
+            if !owner.deck.isEmpty {
+                let drawn = owner.deck.removeFirst()
+                owner.hand.append(drawn)
+            }
         default:
+            break
+        }
+
+        guard let bossType else { return }
+
+        switch bossType {
+        case .ahPuch:
+            if ownerIsP1 {
+                if ahPuchCursesCreated < 3 {
+                    p1.deck.insert(curseCard(), at: 0)
+                    ahPuchCursesCreated += 1
+                    announce("Ah Puch maudit votre deck.")
+                }
+            } else if !instance.isResurrected {
+                ahPuchDeadAllies.append(instance)
+            }
+        case .kukulkan:
+            if let condemnedUnitID, ownerIsP1, condemnedUnitID == instance.id {
+                self.condemnedUnitID = nil
+            }
+        case .chaac:
             break
         }
     }
 
     func endTurn() {
         if currentPlayerIsP1 {
+            if bossType == .kukulkan && !playerDidSacrificeThisTurn {
+                if var god = p2.godSlot {
+                    god.currentAttack += 1
+                    p2.godSlot = god
+                    announce("Kukulkan exige une offrande.")
+                }
+            }
+
             p1CompletedTurns += 1
             if p1RelicIDs.contains("tzolkinCalendar"), p1CompletedTurns % 3 == 0 {
                 p1.blood += 2
@@ -483,14 +646,176 @@ final class GameEngine: ObservableObject {
         } else {
             p2CompletedTurns += 1
         }
-        // Nettoie les états temporaires du joueur actif
+
         resetEndTurnState()
-        // Le sang n'est pas réinitialisé : il s'accumule d'un tour à l'autre
         currentPlayerIsP1.toggle()
         resetActionStateForCurrentPlayer()
+        applyStartOfTurnBossEffectsIfNeeded()
         log.append("—— Tour terminé. À \(activeName()) de jouer.")
-        // pioche automatique
         drawForCurrent(1)
+    }
+
+    private func applyStartOfTurnBossEffectsIfNeeded() {
+        if currentPlayerIsP1 {
+            playerCardsPlayedThisTurn = 0
+            playerDidSacrificeThisTurn = false
+            chaacLastPlayedUnitID = nil
+            clearSilenceOnPlayerUnits()
+            return
+        }
+
+        guard let bossType else { return }
+
+        switch bossType {
+        case .ahPuch:
+            if bossTurnCount() % 3 == 0,
+               ahPuchResurrections < 2,
+               let resurrected = resurrectAhPuchUnit() {
+                deployResurrectedEnemyUnit(resurrected)
+                ahPuchResurrections += 1
+                announce("Ah Puch ressuscite les morts.")
+            }
+        case .chaac:
+            applyChaacStorm()
+            if !chaacSacredStormTriggered,
+               let god = p2.godSlot,
+               god.currentHP * 2 <= god.base.health {
+                chaacSacredStormTriggered = true
+                applyChaacSacredStorm()
+                announce("Chaac déchaîne l’Orage sacré !")
+            }
+        case .kukulkan:
+            if let condemnedUnitID,
+               let slot = p1.board.firstIndex(where: { $0?.id == condemnedUnitID }),
+               let doomed = p1.board[slot] {
+                p1.discard.append(doomed.base)
+                p1.board[slot] = nil
+                triggerDeathEffects(for: doomed, ownerIsP1: true, owner: &p1)
+                announce("Le temple réclame son dû.")
+            }
+            condemnedUnitID = nil
+
+            if bossTurnCount() % 2 == 0,
+               let slot = weakestPlayerUnitSlot(),
+               let doomed = p1.board[slot] {
+                condemnedUnitID = doomed.id
+                announce("Kukulkan exige une offrande.")
+            }
+        }
+    }
+
+    private func clearSilenceOnPlayerUnits() {
+        for i in 0..<p1.board.count {
+            if var inst = p1.board[i] {
+                inst.silencedTurns = max(0, inst.silencedTurns - 1)
+                p1.board[i] = inst
+            }
+        }
+        if var god = p1.godSlot {
+            god.silencedTurns = max(0, god.silencedTurns - 1)
+            p1.godSlot = god
+        }
+    }
+
+    private func weakestPlayerUnitSlot() -> Int? {
+        let candidates = p1.board.enumerated().compactMap { idx, inst -> (Int, Int)? in
+            guard let inst else { return nil }
+            return (idx, inst.currentAttack)
+        }
+        return candidates.min(by: { lhs, rhs in
+            if lhs.1 == rhs.1 { return lhs.0 < rhs.0 }
+            return lhs.1 < rhs.1
+        })?.0
+    }
+
+    private func resurrectAhPuchUnit() -> CardInstance? {
+        while let last = ahPuchDeadAllies.popLast() {
+            if last.isResurrected { continue }
+            let hp = max(1, Int(ceil(Double(last.base.health) / 2.0)))
+            return CardInstance(last.base, currentHP: hp, currentAttack: last.base.attack + 1, isResurrected: true)
+        }
+        return nil
+    }
+
+    private func deployResurrectedEnemyUnit(_ unit: CardInstance) {
+        if let slot = p2.board.firstIndex(where: { $0 == nil }) {
+            p2.board[slot] = unit
+            return
+        }
+        if p2.sacrificeSlot == nil {
+            p2.sacrificeSlot = unit
+        }
+    }
+
+    private func applyChaacStorm() {
+        let slots = p1.board.enumerated().compactMap { idx, inst -> (Int, CardInstance)? in
+            guard let inst else { return nil }
+            if inst.id == chaacLastPlayedUnitID { return nil }
+            return (idx, inst)
+        }
+        guard !slots.isEmpty else { return }
+
+        let target = slots.randomElement()!
+        let roll = Int.random(in: 0..<100)
+        announce("La tempête de Chaac frappe le champ de bataille.")
+
+        if roll < 50 {
+            var inst = target.1
+            inst.currentHP -= 2
+            if inst.currentHP <= 0 {
+                p1.discard.append(inst.base)
+                p1.board[target.0] = nil
+                triggerDeathEffects(for: inst, ownerIsP1: true, owner: &p1)
+            } else {
+                p1.board[target.0] = inst
+            }
+            return
+        }
+
+        if roll < 80 {
+            var inst = target.1
+            inst.silencedTurns = 1
+            p1.board[target.0] = inst
+            return
+        }
+
+        let handCap = 10
+        if p1.hand.count < handCap {
+            p1.board[target.0] = nil
+            p1.hand.append(target.1.base)
+        } else {
+            p1.board[target.0] = nil
+            p1.discard.append(target.1.base)
+            triggerDeathEffects(for: target.1, ownerIsP1: true, owner: &p1)
+        }
+    }
+
+    private func applyChaacSacredStorm() {
+        for i in 0..<p1.board.count {
+            if var inst = p1.board[i] {
+                inst.currentHP -= 2
+                if inst.currentHP <= 0 {
+                    p1.discard.append(inst.base)
+                    p1.board[i] = nil
+                    triggerDeathEffects(for: inst, ownerIsP1: true, owner: &p1)
+                } else {
+                    p1.board[i] = inst
+                }
+            }
+        }
+
+        for i in 0..<p2.board.count {
+            if var inst = p2.board[i] {
+                inst.currentHP -= 1
+                if inst.currentHP <= 0 {
+                    p2.discard.append(inst.base)
+                    p2.board[i] = nil
+                    triggerDeathEffects(for: inst, ownerIsP1: false, owner: &p2)
+                } else {
+                    p2.board[i] = inst
+                }
+            }
+        }
     }
 
     private func resetActionStateForCurrentPlayer() {
@@ -574,6 +899,14 @@ final class GameEngine: ObservableObject {
         }
         lastDrawnCard = drawn.last
         lastDrawnCards = drawn
+    }
+
+    func clearCombatBannerMessage() {
+        combatBannerMessage = nil
+    }
+
+    func isPlayerUnitCondemned(_ unitID: UUID) -> Bool {
+        condemnedUnitID == unitID
     }
 
     // MARK: - IA par priorités
@@ -844,6 +1177,8 @@ extension EnemyAI {
                 case .bloodAltar:
                     candidates.append(ActionCandidate(card: card, handIndex: idx, kind: .playRitual(target: nil)))
                 }
+            case .curse:
+                continue
             }
         }
 

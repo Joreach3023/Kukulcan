@@ -237,6 +237,7 @@ struct CardView: View {
         case .god:    return "DIEU"
         case .ritual: return "RITUEL"
         case .common: return "PEUPLE"
+        case .curse: return "MALÉDICTION"
         }
     }
 

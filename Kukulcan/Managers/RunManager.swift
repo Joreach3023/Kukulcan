@@ -4,6 +4,7 @@ struct RunBattleContext: Identifiable {
     let id = UUID()
     let nodeID: UUID
     let enemy: Card
+    let bossType: BossType?
 }
 
 struct CampfireInteraction: Identifiable {
@@ -66,7 +67,11 @@ final class RunManager: ObservableObject {
 
     private let normalEnemies: [Card] = Array(CardsDB.commons.prefix(3))
     private let eliteEnemies: [Card] = Array(CardsDB.gods.filter { $0.name != "Kukulcan" }.prefix(3))
-    private let bossEnemy: Card = CardsDB.gods.first(where: { $0.name == "Kukulcan" }) ?? CardsDB.gods[0]
+    private let bossEnemies: [(card: Card, type: BossType)] = [
+        (CardsDB.gods.first(where: { $0.name == "Ah Puch" }) ?? CardsDB.gods[0], .ahPuch),
+        (CardsDB.gods.first(where: { $0.name == "Chaac" }) ?? CardsDB.gods[0], .chaac),
+        (CardsDB.gods.first(where: { $0.name == "Kukulcan" }) ?? CardsDB.gods[0], .kukulkan)
+    ]
     private var codexBoostNextReward = false
 
     func startNewRun() {
@@ -330,17 +335,22 @@ final class RunManager: ObservableObject {
         guard var state = runState else { return }
 
         let enemy: Card
+        let bossType: BossType?
         if node.type == .boss {
-            enemy = bossEnemy
+            let selected = bossEnemies.randomElement() ?? bossEnemies[0]
+            enemy = selected.card
+            bossType = selected.type
         } else if node.type == .elite || forceElite {
-            enemy = eliteEnemies.randomElement() ?? bossEnemy
+            enemy = eliteEnemies.randomElement() ?? bossEnemies[0].card
+            bossType = nil
         } else {
             enemy = normalEnemies.randomElement() ?? CardsDB.commons[0]
+            bossType = nil
         }
 
         state.status = .inBattle
         runState = state
-        activeBattle = RunBattleContext(nodeID: node.id, enemy: enemy)
+        activeBattle = RunBattleContext(nodeID: node.id, enemy: enemy, bossType: bossType)
     }
 
     func handleBattleVictory(_ nodeID: UUID) {

@@ -129,7 +129,8 @@ struct RunMapView: View {
             CombatView(
                 engine: GameEngine(
                     p1: PlayerState(name: "Aventurier", deck: runManager.runState?.player.deck.map(\.card) ?? StarterFactory.playerDeck()),
-                    p2: PlayerState(name: battle.enemy.name, deck: StarterFactory.randomDeck())
+                    p2: PlayerState(name: battle.enemy.name, deck: StarterFactory.randomDeck()),
+                    bossType: battle.bossType
                 ),
                 aiLevel: 1,
                 playerRelics: runManager.runState?.player.relics ?? [],
