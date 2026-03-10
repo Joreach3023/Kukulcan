@@ -131,12 +131,19 @@ final class GameEngine: ObservableObject {
     @Published private(set) var p1CompletedTurns: Int = 0
     @Published private(set) var p2CompletedTurns: Int = 0
 
+    private var p1RelicIDs: Set<String> = []
+    private var p1AttackCounter: Int = 0
+
     var current: PlayerState { currentPlayerIsP1 ? p1 : p2 }
     var opponent: PlayerState { currentPlayerIsP1 ? p2 : p1 }
     var canCurrentPlayerAttack: Bool { true }
 
     init(p1: PlayerState, p2: PlayerState) {
         self.p1 = p1; self.p2 = p2
+    }
+
+    func configurePlayerRelics(_ relicIDs: [String]) {
+        p1RelicIDs = Set(relicIDs)
     }
 
     // MARK: setup
@@ -152,8 +159,10 @@ final class GameEngine: ObservableObject {
         currentPlayerIsP1 = startingPlayerIsP1
         p1CompletedTurns = 0
         p2CompletedTurns = 0
+        p1AttackCounter = 0
         log.removeAll()
         log.append("La partie commence avec un plateau vide des deux côtés.")
+        applyPlayerStartOfCombatRelics()
         log.append("\(activeName()) joue en premier (tirage 50/50).")
     }
 
@@ -167,8 +176,23 @@ final class GameEngine: ObservableObject {
         guard c.type == .common else { return }
         guard cp.board[slot] == nil else { return } // slot libre
         cp.hand.remove(at: handIndex)
-        cp.board[slot] = CardInstance(c)
+        var instance = CardInstance(c)
+
+        if p1RelicIDs.contains("ceremonialDrum"), currentPlayerIsP1 {
+            instance.currentAttack += 1
+        }
+
+        if c.name == "Guerrier blessé" {
+            instance.currentHP += 1
+        }
+
+        cp.board[slot] = instance
         setCurrent(cp, log: "\(activeName()) pose \(c.name) sur l’emplacement \(slot+1).")
+
+        if c.name == "Jeune chasseur" {
+            drawForCurrent(1)
+            log.append("Effet d’arrivée de Jeune chasseur : \(activeName()) pioche 1 carte.")
+        }
     }
 
     func sacrificeCommon(handIndex: Int) {
@@ -186,7 +210,17 @@ final class GameEngine: ObservableObject {
         cp.blood += gain
         cp.pendingBonusBlood = 0
         cp.discard.append(c)
+
+        if c.name == "Disciple zélé" {
+            cp.blood += 1
+        }
+
         setCurrent(cp, log: "\(activeName()) sacrifie \(c.name) → +\(gain) Sang (total \(cp.blood)).")
+
+        if c.name == "Éclaireur perdu" {
+            drawForCurrent(1)
+            log.append("Effet de sacrifice d’Éclaireur perdu : \(activeName()) pioche 1 carte.")
+        }
     }
 
     func playRitual(handIndex: Int, targetSlot: Int? = nil) {
@@ -245,7 +279,11 @@ final class GameEngine: ObservableObject {
 
         cp.hand.remove(at: handIndex)
         cp.blood -= c.bloodCost
-        cp.godSlot = CardInstance(c)
+        var god = CardInstance(c)
+        if p1RelicIDs.contains("ceremonialDrum"), currentPlayerIsP1 {
+            god.currentAttack += 1
+        }
+        cp.godSlot = god
 
         // Effets d’arrivée d’exemple
         switch c.name {
@@ -258,6 +296,7 @@ final class GameEngine: ObservableObject {
                     if inst.currentHP <= 0 {
                         op.discard.append(inst.base)
                         op.board[i] = nil
+                        triggerDeathEffects(for: inst.base, owner: &op)
                     } else {
                         op.board[i] = inst
                     }
@@ -291,6 +330,16 @@ final class GameEngine: ObservableObject {
         guard !atker.hasActedThisTurn else { return }
         atker.hasActedThisTurn = true
 
+        let hasJadeSerpentBonus = currentPlayerIsP1 && p1RelicIDs.contains("jadeSerpent")
+        var attackDamage = atker.currentAttack
+        if hasJadeSerpentBonus {
+            p1AttackCounter += 1
+            if p1AttackCounter % 3 == 0 {
+                attackDamage += 4
+                log.append("Serpent de jade : +4 dégâts bonus sur cette attaque.")
+            }
+        }
+
         func assignBackAttacker() {
             if isGod {
                 atkOwner.godSlot = atker
@@ -301,19 +350,25 @@ final class GameEngine: ObservableObject {
 
         switch target {
         case .player:
-            defOwner.hp -= atker.currentAttack
+            defOwner.hp -= attackDamage
             if defOwner.hp < 0 { defOwner.hp = 0 }
-            log.append("\(activeName()) attaque directement → \(passiveName()) perd \(atker.currentAttack) PV (\(defOwner.hp) restants).")
+            log.append("\(activeName()) attaque directement → \(passiveName()) perd \(attackDamage) PV (\(defOwner.hp) restants).")
             assignBackAttacker()
 
         case .god:
             guard var def = defOwner.godSlot else { return }
-            def.currentHP -= atker.currentAttack
+            def.currentHP -= attackDamage
             atker.currentHP -= def.currentAttack
             if def.currentHP <= 0 { defOwner.discard.append(def.base); defOwner.godSlot = nil }
             if atker.currentHP <= 0 {
-                if isGod { atkOwner.discard.append(atker.base); atkOwner.godSlot = nil }
-                else { atkOwner.discard.append(atker.base); atkOwner.board[slot] = nil }
+                if isGod {
+                    atkOwner.discard.append(atker.base)
+                    atkOwner.godSlot = nil
+                } else {
+                    atkOwner.discard.append(atker.base)
+                    atkOwner.board[slot] = nil
+                    triggerDeathEffects(for: atker.base, owner: &atkOwner)
+                }
             } else {
                 assignBackAttacker()
                 if def.currentHP > 0 {
@@ -324,22 +379,38 @@ final class GameEngine: ObservableObject {
         case .boardSlot(let i):
             guard i >= 0, i < defOwner.board.count, var def = defOwner.board[i] else {
                 // pas de défenseur → attaque le joueur
-                defOwner.hp -= atker.currentAttack
+                defOwner.hp -= attackDamage
                 if defOwner.hp < 0 { defOwner.hp = 0 }
-                log.append("\(activeName()) trouve la voie libre et frappe \(passiveName()) pour \(atker.currentAttack) PV.")
+                log.append("\(activeName()) trouve la voie libre et frappe \(passiveName()) pour \(attackDamage) PV.")
                 assignBackAttacker()
                 break
             }
             // combat
-            def.currentHP -= atker.currentAttack
+            def.currentHP -= attackDamage
             atker.currentHP -= def.currentAttack
 
-            if def.currentHP <= 0 { defOwner.discard.append(def.base); defOwner.board[i] = nil }
-            else { defOwner.board[i] = def }
+            if def.currentHP <= 0 {
+                defOwner.discard.append(def.base)
+                defOwner.board[i] = nil
+                triggerDeathEffects(for: def.base, owner: &defOwner)
+
+                if atker.base.name == "Archer maladroit" {
+                    drawForCurrent(1)
+                    log.append("Archer maladroit élimine une unité : \(activeName()) pioche 1 carte.")
+                }
+            } else {
+                defOwner.board[i] = def
+            }
 
             if atker.currentHP <= 0 {
-                if isGod { atkOwner.discard.append(atker.base); atkOwner.godSlot = nil }
-                else { atkOwner.discard.append(atker.base); atkOwner.board[slot] = nil }
+                if isGod {
+                    atkOwner.discard.append(atker.base)
+                    atkOwner.godSlot = nil
+                } else {
+                    atkOwner.discard.append(atker.base)
+                    atkOwner.board[slot] = nil
+                    triggerDeathEffects(for: atker.base, owner: &atkOwner)
+                }
             } else {
                 assignBackAttacker()
             }
@@ -349,9 +420,66 @@ final class GameEngine: ObservableObject {
         setOpponent(defOwner)
     }
 
+    private func applyPlayerStartOfCombatRelics() {
+        guard !p1RelicIDs.isEmpty else { return }
+
+        if p1RelicIDs.contains("palenqueRoyalJade") {
+            p1.blood += 1
+            log.append("Jade royal de Palenque : +1 Sang au début du combat.")
+        }
+
+        if p1RelicIDs.contains("pakalFuneraryMask") {
+            p1.hp = min(10, p1.hp + 5)
+            log.append("Masque funéraire de Pakal : vous récupérez 5 PV au début du combat.")
+        }
+
+        if p1RelicIDs.contains("sunStone") {
+            for i in 0..<p2.board.count {
+                if var inst = p2.board[i] {
+                    inst.currentHP -= 3
+                    if inst.currentHP <= 0 {
+                        p2.discard.append(inst.base)
+                        p2.board[i] = nil
+                        triggerDeathEffects(for: inst.base, owner: &p2)
+                    } else {
+                        p2.board[i] = inst
+                    }
+                }
+            }
+            if let god = p2.godSlot {
+                var updatedGod = god
+                updatedGod.currentHP -= 3
+                if updatedGod.currentHP <= 0 {
+                    p2.discard.append(updatedGod.base)
+                    p2.godSlot = nil
+                } else {
+                    p2.godSlot = updatedGod
+                }
+            }
+            log.append("Pierre solaire : 3 dégâts initiaux à tous les ennemis.")
+        }
+    }
+
+    private func triggerDeathEffects(for card: Card, owner: inout PlayerState) {
+        switch card.name {
+        case "Prisonnier captif":
+            owner.blood += 1
+        case "Prophète délirant":
+            if owner.deck.isEmpty { return }
+            let drawn = owner.deck.removeFirst()
+            owner.hand.append(drawn)
+        default:
+            break
+        }
+    }
+
     func endTurn() {
         if currentPlayerIsP1 {
             p1CompletedTurns += 1
+            if p1RelicIDs.contains("tzolkinCalendar"), p1CompletedTurns % 3 == 0 {
+                p1.blood += 2
+                log.append("Calendrier Tzolk’in : +2 Sang après 3 tours.")
+            }
         } else {
             p2CompletedTurns += 1
         }

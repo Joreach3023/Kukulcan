@@ -380,6 +380,7 @@ struct CombatView: View {
         }
         .onAppear {
             NotificationCenter.default.post(name: .combatViewDidAppear, object: nil)
+            engine.configurePlayerRelics(playerRelics.map { $0.relicID.rawValue })
             // Démarrer la partie si pas déjà fait
             if engine.p1.hand.isEmpty && engine.p2.hand.isEmpty {
                 engine.start()
