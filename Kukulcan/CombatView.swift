@@ -233,6 +233,8 @@ struct CombatView: View {
                 if player.godSlot == nil && player.blood >= card.bloodCost {
                     return true
                 }
+            case .curse:
+                return true
             }
         }
 
@@ -408,6 +410,11 @@ struct CombatView: View {
         .onChange(of: playerActionStateSignature) {
             maybeAutoEndPlayerTurn()
         }
+        .onChange(of: engine.combatBannerMessage) { _, message in
+            guard let message else { return }
+            showTurnBanner(message)
+            engine.clearCombatBannerMessage()
+        }
         .sheet(isPresented: $showTargetPickerForRitual) {
             ritualTargetSheet
                 .presentationDetents([.height(280)])
@@ -522,6 +529,11 @@ struct CombatView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .foregroundColor(.white)
+                if let bossType = engine.bossType {
+                    Label(bossPassiveTitle(for: bossType), systemImage: "crown.fill")
+                        .font(.caption2.bold())
+                        .foregroundStyle(.yellow)
+                }
                 HStack(spacing: 10) {
                     HStack(spacing: 4) {
                         Image(systemName: "heart.fill")
@@ -542,6 +554,17 @@ struct CombatView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(alignment: .bottom) {
+            if let limit = engine.playerCardPlayLimit {
+                Text("Cartes jouées: \(engine.playerCardsPlayedThisTurn)/\(limit)")
+                    .font(.caption2.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.black.opacity(0.65), in: Capsule())
+                    .offset(y: 12)
+            }
+        }
     }
 
     // MARK: - Plateau adverse (miroir joueur/adversaire)
@@ -592,6 +615,18 @@ struct CombatView: View {
                     let inst = enemyState.board[i]
                     slotView(for: inst?.base, hp: inst?.currentHP)
                         .rotationEffect(.degrees(180))
+                        .overlay(alignment: .topLeading) {
+                            if inst?.isResurrected == true {
+                                Text("Ressuscité")
+                                    .font(.caption2.bold())
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3)
+                                    .background(.black.opacity(0.7), in: Capsule())
+                                    .foregroundStyle(.white)
+                                    .rotationEffect(.degrees(180))
+                                    .padding(4)
+                            }
+                        }
                         .background(
                             GeometryReader { geo in
                                 let frame = geo.frame(in: .named("combatArea"))
@@ -732,6 +767,14 @@ struct CombatView: View {
                             )
                             .overlay(
                                 VStack(spacing: 6) {
+                                    if let inst, engine.isPlayerUnitCondemned(inst.id) {
+                                        Text("Condamnée")
+                                            .font(.caption2.bold())
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 3)
+                                            .background(.red.opacity(0.75), in: Capsule())
+                                            .foregroundStyle(.white)
+                                    }
                                     // Attaquer depuis ce slot
                                     if inst != nil {
                                         Button {
@@ -1035,6 +1078,13 @@ struct CombatView: View {
                     engine.invokeGod(handIndex: index)
                 } label: { labelChip("Invoquer", system: "bolt.heart.fill") }
                 .disabled(!isPlayerInteractionEnabled || playerState.blood < c.bloodCost || playerState.godSlot != nil)
+
+            case .curse:
+                Button {
+                    guard isPlayerInteractionEnabled else { return }
+                    engine.playCurse(handIndex: index)
+                } label: { labelChip("Subir", system: "exclamationmark.triangle.fill") }
+                .disabled(!isPlayerInteractionEnabled)
             }
         }
     }
@@ -1562,6 +1612,14 @@ struct CombatView: View {
                     .foregroundStyle(.secondary)
             )
             .frame(width: width, height: height)
+    }
+
+    private func bossPassiveTitle(for boss: BossType) -> String {
+        switch boss {
+        case .ahPuch: return "Malédiction des morts"
+        case .chaac: return "Tempête divine"
+        case .kukulkan: return "Jugement des dieux"
+        }
     }
 
     private func playEndTurnSound() {

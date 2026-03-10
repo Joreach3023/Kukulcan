@@ -255,6 +255,7 @@ struct CardDetailView: View {
         case .god:    return LinearGradient(colors: [.orange, .red], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .ritual: return LinearGradient(colors: [.purple, .pink], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .common: return LinearGradient(colors: [.gray, .black.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        case .curse: return LinearGradient(colors: [.red, .black], startPoint: .topLeading, endPoint: .bottomTrailing)
         }
     }
 
@@ -263,6 +264,7 @@ struct CardDetailView: View {
         case .god:    return "DIEU"
         case .ritual: return "RITUEL"
         case .common: return "PEUPLE"
+        case .curse: return "MALÉDICTION"
         }
     }
 
@@ -271,6 +273,7 @@ struct CardDetailView: View {
         case .god:    return "sparkles"
         case .ritual: return "wand.and.stars"
         case .common: return "person.fill"
+        case .curse: return "exclamationmark.triangle.fill"
         }
     }
 

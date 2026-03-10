@@ -166,6 +166,11 @@ struct CardsDB {
             img: "kukulcan",                      // ⚠️ bien orthographié
             effect: "Invocation : le serpent à plumes se déchaîne.",
             lore: "Le serpent à plumes s’élève dans le vent et fauche les orgueilleux d’un seul souffle."),
+        god("Ah Puch",
+            atk: 6, hp: 8,
+            img: "buluc_chabtan",
+            effect: "Invocation : les morts répondent à son appel.",
+            lore: "Seigneur de la mort, Ah Puch transforme chaque perte en malédiction."),
         god("Chaac",
             atk: 6, hp: 7,
             img: "chaac",
