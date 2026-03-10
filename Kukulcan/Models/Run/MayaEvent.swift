@@ -124,7 +124,7 @@ enum MayaRelicPool {
             relicID: .pakalFuneraryMask,
             name: "Masque funéraire de Pakal",
             description: "Masque de jade enterré avec le roi Pakal de Palenque.",
-            effect: "Lorsque votre vie tombe sous 50 %, gagnez +2 pouvoir pendant 2 tours.",
+            effect: "Début de combat : récupérez 5 PV.",
             rarity: .rare,
             image: "relic_placeholder"
         ),
@@ -140,7 +140,7 @@ enum MayaRelicPool {
             relicID: .palenqueRoyalJade,
             name: "Jade royal de Palenque",
             description: "Un bijou porté par les rois mayas, symbole de vie et de pouvoir.",
-            effect: "+1 énergie au début du combat.",
+            effect: "Début de combat : +1 Sang.",
             rarity: .rare,
             image: "relic_placeholder"
         ),
@@ -148,7 +148,7 @@ enum MayaRelicPool {
             relicID: .tzolkinCalendar,
             name: "Calendrier Tzolk’in",
             description: "Le calendrier sacré de 260 jours utilisé par les prêtres mayas.",
-            effect: "Tous les 3 tours, gagnez +2 énergie.",
+            effect: "Tous les 3 tours, gagnez +2 Sang.",
             rarity: .legendary,
             image: "relic_placeholder"
         ),
@@ -156,7 +156,7 @@ enum MayaRelicPool {
             relicID: .quetzalFeather,
             name: "Plume de Quetzal",
             description: "Plume sacrée de l’oiseau quetzal, symbole de royauté.",
-            effect: "+2 esquive au début du combat.",
+            effect: "Après un combat élite gagné, récupérez 2 PV.",
             rarity: .common,
             image: "relic_placeholder"
         ),
@@ -180,7 +180,7 @@ enum MayaRelicPool {
             relicID: .obsidianOffering,
             name: "Offrande d’obsidienne",
             description: "Fragment d’obsidienne utilisé dans les offrandes aux dieux.",
-            effect: "Chaque ennemi vaincu donne +2 or supplémentaire.",
+            effect: "Après chaque combat gagné, gagnez +2 or supplémentaires.",
             rarity: .common,
             image: "relic_placeholder"
         ),
@@ -188,7 +188,7 @@ enum MayaRelicPool {
             relicID: .sunStone,
             name: "Pierre solaire",
             description: "Pierre gravée représentant le pouvoir du soleil.",
-            effect: "Au début du combat, inflige 3 dégâts à tous les ennemis.",
+            effect: "Début de combat : inflige 3 dégâts à tous les ennemis.",
             rarity: .rare,
             image: "relic_placeholder"
         )
