@@ -191,14 +191,7 @@ final class GameEngine: ObservableObject {
     }
 
     private func curseCard() -> Card {
-        Card(
-            name: "Malédiction",
-            type: .curse,
-            rarity: .common,
-            imageName: "danse_macabre",
-            effect: "Ne fait rien. Détruite: votre prochaine carte coûte +1 sang.",
-            lore: "Le souffle d’Ah Puch alourdit chaque offrande."
-        )
+        CardsDB.ahPuchMaledictionCurse()
     }
 
     private func announce(_ text: String) {
