@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct RunMapView: View {
+    @EnvironmentObject var collection: CollectionStore
     @StateObject private var runManager = RunManager()
     @State private var showRelicsSheet = false
 
@@ -35,8 +36,11 @@ struct RunMapView: View {
 
                 VStack(spacing: 12) {
                     if let run = runManager.runState {
-                        header(run: run)
+                        globalHUD
+                        runHUD(run: run)
+                        runProgressHUD(run: run)
                         mapCanvas(run: run)
+                            .padding(.top, 6)
                         statusFooter(run: run)
                             .padding(.bottom, max(8, bottomInset + 6))
                     } else {
@@ -149,25 +153,42 @@ struct RunMapView: View {
         }
     }
 
-    private func header(run: RunState) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                hudBadge(text: "\(run.player.currentHP)/\(run.player.maxHP)", icon: "heart.fill", tint: .red)
-                hudBadge(text: "\(run.player.gold)", icon: "bitcoinsign.circle.fill", tint: .yellow)
-            }
+    private var globalHUD: some View {
+        HStack {
+            Label("Or : \(collection.gold)", systemImage: "crown.fill")
+                .font(.subheadline.bold())
+                .foregroundStyle(.yellow)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(.white.opacity(0.2), lineWidth: 1)
+        )
+    }
 
-            HStack(spacing: 8) {
-                compactBadge(text: "Map \(run.currentAct)/\(run.totalActs)", icon: "map.fill")
-                compactBadge(text: "Boss \(run.bossesDefeated)/\(run.totalBosses)", icon: "crown.fill")
-                compactBadge(text: "Deck \(run.player.deck.count)", icon: "rectangle.stack.fill")
-                compactBadge(text: "Reliques \(run.player.relics.count)", icon: "sparkles")
-                Spacer(minLength: 0)
-                RelicsButton(count: run.player.relics.count) {
-                    showRelicsSheet = true
-                }
+    private func runHUD(run: RunState) -> some View {
+        HStack(spacing: 8) {
+            hudBadge(text: "HP \(run.player.currentHP)/\(run.player.maxHP)", icon: "heart.fill", tint: .red)
+            hudBadge(text: "Gold \(run.player.gold)", icon: "bitcoinsign.circle.fill", tint: .yellow)
+            hudBadge(text: "Blood 0", icon: "drop.fill", tint: .orange)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func runProgressHUD(run: RunState) -> some View {
+        HStack(spacing: 8) {
+            compactBadge(text: "Map \(run.currentAct)/\(run.totalActs)", icon: "map.fill")
+            compactBadge(text: "Boss \(run.bossesDefeated)/\(run.totalBosses)", icon: "crown.fill")
+            compactBadge(text: "Deck \(run.player.deck.count)", icon: "rectangle.stack.fill")
+            compactBadge(text: "Reliques \(run.player.relics.count)", icon: "sparkles")
+            Spacer(minLength: 0)
+            RelicsButton(count: run.player.relics.count) {
+                showRelicsSheet = true
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func mapCanvas(run: RunState) -> some View {
@@ -177,8 +198,9 @@ struct RunMapView: View {
             let contentHeight = max(height, width / mapAspectRatio)
 
             ZStack {
-                mapBackground
+                Color.black.opacity(0.2)
                     .frame(width: width, height: contentHeight)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
                     .clipShape(RoundedRectangle(cornerRadius: 18))
 
                 connectionsLayer(run: run, size: CGSize(width: width, height: contentHeight))
@@ -374,9 +396,13 @@ struct RunMapView: View {
             }
         }
         .font(.caption.bold())
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(.white.opacity(0.18), lineWidth: 1)
+        )
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
