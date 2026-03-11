@@ -16,6 +16,7 @@ struct RunMapView: View {
         static let fogFarVeilOpacity = 0.58
         static let fogFarContentOpacity = 0.4
         static let fogMaxBlur: CGFloat = 2.8
+        static let backgroundZoomOut: CGFloat = 0.9
     }
 
     var body: some View {
@@ -195,21 +196,27 @@ struct RunMapView: View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let height = proxy.size.height
-            let contentHeight = max(height, width / mapAspectRatio)
+            let rowCount = max(1, (run.nodes.map(\.row).max() ?? 0) + 1)
+            let contentHeight = max(height * 1.2, CGFloat(rowCount) * 86)
+            let mapSize = CGSize(width: width, height: contentHeight)
 
-            ZStack {
-                Color.black.opacity(0.2)
-                    .frame(width: width, height: contentHeight)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
+            ScrollView(.vertical, showsIndicators: true) {
+                ZStack {
+                    Color.black.opacity(0.2)
+                        .frame(width: width, height: contentHeight)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
 
-                connectionsLayer(run: run, size: CGSize(width: width, height: contentHeight))
+                    connectionsLayer(run: run, size: mapSize)
 
-                ForEach(run.nodes) { node in
-                    nodeMarker(node: node, run: run, size: CGSize(width: width, height: contentHeight))
+                    ForEach(run.nodes) { node in
+                        nodeMarker(node: node, run: run, size: mapSize)
+                    }
                 }
+                .frame(width: width, height: contentHeight)
             }
-            .frame(height: contentHeight)
+            .frame(height: height)
+            .scrollBounceBehavior(.basedOnSize)
         }
         .frame(maxHeight: .infinity)
     }
@@ -220,10 +227,12 @@ struct RunMapView: View {
                 Image("roguelike_map_kukulcan")
                     .resizable()
                     .scaledToFill()
+                    .scaleEffect(MapTuning.backgroundZoomOut)
             } else {
                 Image("bg_pyramid_close")
                     .resizable()
                     .scaledToFill()
+                    .scaleEffect(MapTuning.backgroundZoomOut)
             }
         }
     }
@@ -368,12 +377,12 @@ struct RunMapView: View {
     private func mapPoint(for node: MapNode, in size: CGSize) -> CGPoint {
         let rows = max(1, (runManager.runState?.nodes.map(\.row).max() ?? 1))
         let xStep = size.width / max(1, mapColumns - 1)
-        let yStep = size.height / CGFloat(rows + 1)
-        let topPadding = yStep * 0.75
-        let bottomPadding = yStep * 1.15
+        let yStep = size.height / CGFloat(rows + 2)
+        let topPadding = yStep * 1.0
+        let bottomPadding = yStep * 0.9
         let x = CGFloat(node.column) * xStep
-        let y = size.height - bottomPadding - CGFloat(node.row) * yStep
-        return CGPoint(x: x, y: max(topPadding, y))
+        let y = topPadding + CGFloat(node.row) * yStep
+        return CGPoint(x: x, y: min(size.height - bottomPadding, y))
     }
 
     private func statusFooter(run: RunState) -> some View {
