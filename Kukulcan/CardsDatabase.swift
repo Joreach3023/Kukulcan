@@ -85,6 +85,26 @@ struct CardsDB {
         )
     }
 
+    private static func curse(
+        _ name: String,
+        img: String,
+        effect: String,
+        lore: String? = nil
+    ) -> Card {
+        Card(
+            name: name,
+            type: .curse,
+            rarity: .common,
+            imageName: img,
+            attack: 0,
+            health: 0,
+            ritual: nil,
+            bloodCost: 0,
+            effect: effect,
+            lore: lore
+        )
+    }
+
     // MARK: - COMMUNES (Disciples / Guerriers faibles)
 
     static let commons: [Card] = [
@@ -192,6 +212,17 @@ struct CardsDB {
             effect: "Invocation : héraut de la guerre.",
             lore: "La guerre est sa prière ; il exige des cœurs ardents et offre la victoire en retour.")
     ]
+
+    /// Carte spéciale générée uniquement par Ah Puch en combat.
+    /// N'est volontairement pas incluse dans les pools de collection/récompenses.
+    static func ahPuchMaledictionCurse() -> Card {
+        curse(
+            "Malédiction",
+            img: "curse_malediction",
+            effect: "Ne fait rien. Détruite: votre prochaine carte coûte +1 sang.",
+            lore: "Le souffle d’Ah Puch alourdit chaque offrande."
+        )
+    }
 
     // MARK: - Decks utilitaires
 
