@@ -14,6 +14,10 @@ struct RunState: Codable {
     var player: PlayerRunState
     var nodes: [MapNode]
     var currentNodeID: UUID?
+    var currentAct: Int
+    var totalActs: Int
+    var bossesDefeated: Int
+    var totalBosses: Int
 
     var isFinished: Bool {
         status == .victory || status == .gameOver

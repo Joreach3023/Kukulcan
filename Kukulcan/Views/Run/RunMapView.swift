@@ -157,6 +157,8 @@ struct RunMapView: View {
             }
 
             HStack(spacing: 8) {
+                compactBadge(text: "Map \(run.currentAct)/\(run.totalActs)", icon: "map.fill")
+                compactBadge(text: "Boss \(run.bossesDefeated)/\(run.totalBosses)", icon: "crown.fill")
                 compactBadge(text: "Deck \(run.player.deck.count)", icon: "rectangle.stack.fill")
                 compactBadge(text: "Reliques \(run.player.relics.count)", icon: "sparkles")
                 Spacer(minLength: 0)
@@ -356,7 +358,7 @@ struct RunMapView: View {
         Group {
             switch run.status {
             case .victory:
-                Text("🏆 Victoire ! Le temple du sommet est conquis.")
+                Text("🏆 Victoire ! Kukulcan est tombé.")
                     .font(.headline)
                     .foregroundStyle(.green)
             case .gameOver:
@@ -367,7 +369,7 @@ struct RunMapView: View {
                 Text("Récompense en cours...")
                     .foregroundStyle(.secondary)
             default:
-                Text("Choisissez 1 des \(MapTuning.startNodeCount) voies puis progressez vers le temple du haut.")
+                Text("Progressez jusqu'au boss de la map. Après le boss 3, Kukulcan apparaît immédiatement.")
                     .foregroundStyle(.secondary)
             }
         }
