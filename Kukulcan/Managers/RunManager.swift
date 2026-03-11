@@ -66,8 +66,6 @@ final class RunManager: ObservableObject {
     @Published var pendingCardSelection: CardSelectionInteraction?
     @Published var pendingCardResult: CardSelectionResult?
 
-    private let normalEnemies: [Card] = Array(CardsDB.commons.prefix(3))
-    private let eliteEnemies: [Card] = Array(CardsDB.gods.filter { $0.name != "Kukulcan" }.prefix(3))
     private let totalActs = 3
     private let totalBosses = 4
 
@@ -118,12 +116,15 @@ final class RunManager: ObservableObject {
         case .boss:
             startBattle(for: node)
         case .campfire:
-            let healAmount = max(1, Int(Double(state.player.maxHP) * 0.3))
+            let missingHP = max(0, state.player.maxHP - state.player.currentHP)
+            let percentHeal = Int(Double(state.player.maxHP) * 0.2)
+            let scalingBonus = state.currentAct * 2
+            let healAmount = min(missingHP, max(4, percentHeal + scalingBonus))
             pendingCampfire = CampfireInteraction(nodeID: node.id, healAmount: healAmount)
         case .shop:
             pendingShop = ShopInteraction(
                 nodeID: node.id,
-                relicOffers: randomShopRelics(count: 3)
+                relicOffers: randomShopRelics(count: 3, excluding: state.player.relics)
             )
         case .event:
             if let event = MayaEventCatalog.events.randomElement() {
@@ -339,17 +340,15 @@ final class RunManager: ObservableObject {
     func startBattle(for node: MapNode, forceElite: Bool = false) {
         guard var state = runState else { return }
 
+        let progress = runProgress(for: node, in: state)
         let enemy: Card
         let bossType: BossType?
         if node.type == .boss {
             let selected = nextBoss(after: state.bossesDefeated)
             enemy = selected.card
             bossType = selected.type
-        } else if node.type == .elite || forceElite {
-            enemy = eliteEnemies.randomElement() ?? CardsDB.gods[0]
-            bossType = nil
         } else {
-            enemy = normalEnemies.randomElement() ?? CardsDB.commons[0]
+            enemy = scaledEnemyCard(for: node, in: state, progress: progress, forceElite: forceElite)
             bossType = nil
         }
 
@@ -420,7 +419,12 @@ final class RunManager: ObservableObject {
         activeBattle = nil
         state.status = .choosingReward
         runState = state
-        pendingRewards = buildCombatRewards(for: state.player, includeBonusCard: codexBoostNextReward)
+        pendingRewards = buildCombatRewards(
+            for: state.player,
+            nodeType: state.nodes.first(where: { $0.id == nodeID })?.type ?? .combat,
+            currentAct: state.currentAct,
+            includeBonusCard: codexBoostNextReward
+        )
         codexBoostNextReward = false
     }
 
@@ -491,9 +495,61 @@ final class RunManager: ObservableObject {
         }
     }
 
-    private func randomShopRelics(count: Int) -> [ShopRelicOffer] {
+    private func scaledEnemyCard(for node: MapNode, in state: RunState, progress: Double, forceElite: Bool) -> Card {
+        let isEliteEncounter = node.type == .elite || forceElite
+        let pool: [Card]
+
+        if isEliteEncounter {
+            let elitePool = CardsDB.gods.filter { $0.name != "Kukulcan" }
+            pool = elitePool.isEmpty ? CardsDB.commons : elitePool
+        } else if progress < 0.34 {
+            pool = Array(CardsDB.commons.shuffled().prefix(4))
+        } else if progress < 0.67 {
+            pool = Array(CardsDB.commons.shuffled().prefix(7))
+        } else {
+            pool = CardsDB.commons
+        }
+
+        let baseEnemy = pool.randomElement() ?? CardsDB.commons[0]
+        let hpBonus = enemyHealthBonus(for: node, in: state, progress: progress, isEliteEncounter: isEliteEncounter)
+
+        return Card(
+            id: baseEnemy.id,
+            name: baseEnemy.name,
+            type: baseEnemy.type,
+            rarity: baseEnemy.rarity,
+            imageName: baseEnemy.imageName,
+            attack: baseEnemy.attack,
+            health: max(1, baseEnemy.health + hpBonus),
+            ritual: baseEnemy.ritual,
+            bloodCost: baseEnemy.bloodCost,
+            effect: baseEnemy.effect,
+            lore: baseEnemy.lore
+        )
+    }
+
+    private func runProgress(for node: MapNode, in state: RunState) -> Double {
+        let maxRow = state.nodes.map(\.row).max() ?? 1
+        let rowProgress = Double(node.row) / Double(max(1, maxRow))
+        let actProgress = Double(max(0, state.currentAct - 1)) / Double(max(1, state.totalActs - 1))
+        return min(1.0, max(0.0, (rowProgress * 0.7) + (actProgress * 0.3)))
+    }
+
+    private func enemyHealthBonus(for node: MapNode, in state: RunState, progress: Double, isEliteEncounter: Bool) -> Int {
+        let actBonus = max(0, state.currentAct - 1) * 2
+        let progressBonus = Int((progress * 5.0).rounded(.down))
+        let eliteBonus = isEliteEncounter ? 4 : 0
+        let bossBonus = node.type == .boss ? 6 : 0
+        return actBonus + progressBonus + eliteBonus + bossBonus
+    }
+
+    private func randomShopRelics(count: Int, excluding ownedRelics: [Relic]) -> [ShopRelicOffer] {
         let minCost = 75
-        return Array(MayaRelicPool.all.shuffled().prefix(count)).map {
+        let ownedIDs = Set(ownedRelics.map(\.relicID))
+        let availablePool = MayaRelicPool.all.filter { !ownedIDs.contains($0.relicID) }
+        let selectionPool = availablePool.isEmpty ? MayaRelicPool.all : availablePool
+
+        return Array(selectionPool.shuffled().prefix(count)).map {
             ShopRelicOffer(relic: $0, cost: minCost + rarityCostBonus(for: $0.rarity))
         }
     }
@@ -581,15 +637,30 @@ final class RunManager: ObservableObject {
         return Bool.random() ? .ahPuch : .chaac
     }
 
-    private func buildCombatRewards(for player: PlayerRunState, includeBonusCard: Bool = false) -> [Reward] {
+    private func buildCombatRewards(
+        for player: PlayerRunState,
+        nodeType: NodeType,
+        currentAct: Int,
+        includeBonusCard: Bool = false
+    ) -> [Reward] {
         _ = player
-        let basePool = CardsDB.commons + CardsDB.rituals
+        let scaledAct = max(1, currentAct)
+        var basePool = CardsDB.commons + CardsDB.rituals
+        if scaledAct >= 2 {
+            basePool += CardsDB.gods.filter { $0.rarity == .rare || $0.rarity == .epic }
+        }
+
         let cardCount = includeBonusCard ? 3 : 2
         let offeredCards = Array(basePool.shuffled().prefix(cardCount))
-        return offeredCards.map(Reward.card) + [.gold(20)]
+        let baseGold = 15 + (scaledAct * 5)
+        let nodeGoldBonus = nodeType == .elite ? 15 : 0
+        let healReward = max(2, 2 + scaledAct)
+
+        return offeredCards.map(Reward.card) + [.gold(baseGold + nodeGoldBonus), .heal(healReward)]
     }
 
     private func grantRelic(_ relic: Relic, to player: inout PlayerRunState) {
+        guard !player.relics.contains(where: { $0.relicID == relic.relicID }) else { return }
         player.relics.append(relic)
     }
 
