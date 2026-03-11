@@ -5,6 +5,7 @@ struct RunBattleContext: Identifiable {
     let nodeID: UUID
     let enemy: Card
     let bossType: BossType?
+    let isImmediateFinalBoss: Bool
 }
 
 struct CampfireInteraction: Identifiable {
@@ -67,23 +68,27 @@ final class RunManager: ObservableObject {
 
     private let normalEnemies: [Card] = Array(CardsDB.commons.prefix(3))
     private let eliteEnemies: [Card] = Array(CardsDB.gods.filter { $0.name != "Kukulcan" }.prefix(3))
-    private let bossEnemies: [(card: Card, type: BossType)] = [
-        (CardsDB.gods.first(where: { $0.name == "Ah Puch" }) ?? CardsDB.gods[0], .ahPuch),
-        (CardsDB.gods.first(where: { $0.name == "Chaac" }) ?? CardsDB.gods[0], .chaac),
-        (CardsDB.gods.first(where: { $0.name == "Kukulcan" }) ?? CardsDB.gods[0], .kukulkan)
-    ]
+    private let totalActs = 3
+    private let totalBosses = 4
+
+    private var bossSequence: [(card: Card, type: BossType)] = []
     private var codexBoostNextReward = false
 
     func startNewRun() {
         let starterCards = Array((CardsDB.commons.prefix(6) + CardsDB.rituals.prefix(2)).shuffled())
         let playerDeck = starterCards.map { RunCardInstance(card: $0) }
         let graph = MapGenerator().generateActMap()
+        bossSequence = buildBossSequence()
 
         runState = RunState(
             status: .onMap,
             player: PlayerRunState(deck: playerDeck),
             nodes: graph.nodes,
-            currentNodeID: nil
+            currentNodeID: nil,
+            currentAct: 1,
+            totalActs: totalActs,
+            bossesDefeated: 0,
+            totalBosses: totalBosses
         )
         activeBattle = nil
         pendingRewards = []
@@ -337,11 +342,11 @@ final class RunManager: ObservableObject {
         let enemy: Card
         let bossType: BossType?
         if node.type == .boss {
-            let selected = bossEnemies.randomElement() ?? bossEnemies[0]
+            let selected = nextBoss(after: state.bossesDefeated)
             enemy = selected.card
             bossType = selected.type
         } else if node.type == .elite || forceElite {
-            enemy = eliteEnemies.randomElement() ?? bossEnemies[0].card
+            enemy = eliteEnemies.randomElement() ?? CardsDB.gods[0]
             bossType = nil
         } else {
             enemy = normalEnemies.randomElement() ?? CardsDB.commons[0]
@@ -350,13 +355,18 @@ final class RunManager: ObservableObject {
 
         state.status = .inBattle
         runState = state
-        activeBattle = RunBattleContext(nodeID: node.id, enemy: enemy, bossType: bossType)
+        activeBattle = RunBattleContext(nodeID: node.id, enemy: enemy, bossType: bossType, isImmediateFinalBoss: false)
     }
 
     func handleBattleVictory(_ nodeID: UUID) {
-        guard var state = runState else { return }
+        guard var state = runState,
+              let resolvedBattle = activeBattle else { return }
 
-        completeNode(nodeID, in: &state)
+        let isImmediateFinalBoss = resolvedBattle.isImmediateFinalBoss
+
+        if !isImmediateFinalBoss {
+            completeNode(nodeID, in: &state)
+        }
 
         if let node = state.nodes.first(where: { $0.id == nodeID }) {
             state.currentNodeID = nodeID
@@ -369,9 +379,37 @@ final class RunManager: ObservableObject {
                 state.player.currentHP = min(state.player.maxHP, state.player.currentHP + 2)
             }
 
-            if node.type == .boss {
+            if node.type == .boss || isImmediateFinalBoss {
                 state.player.gold += 100
-                state.status = .victory
+                state.bossesDefeated += 1
+
+                if state.bossesDefeated >= state.totalBosses {
+                    state.status = .victory
+                    runState = state
+                    activeBattle = nil
+                    pendingRewards = []
+                    return
+                }
+
+                if state.bossesDefeated == state.totalActs {
+                    let finalBoss = nextBoss(after: state.bossesDefeated)
+                    state.status = .inBattle
+                    runState = state
+                    activeBattle = RunBattleContext(
+                        nodeID: nodeID,
+                        enemy: finalBoss.card,
+                        bossType: finalBoss.type,
+                        isImmediateFinalBoss: true
+                    )
+                    pendingRewards = []
+                    return
+                }
+
+                state.currentAct = min(state.totalActs, state.currentAct + 1)
+                let newMap = MapGenerator().generateActMap()
+                state.nodes = newMap.nodes
+                state.currentNodeID = nil
+                state.status = .onMap
                 runState = state
                 activeBattle = nil
                 pendingRewards = []
@@ -512,6 +550,35 @@ final class RunManager: ObservableObject {
             effect: card.effect + " (Améliorée)",
             lore: card.lore
         )
+    }
+
+
+    private func buildBossSequence() -> [(card: Card, type: BossType)] {
+        let nonKukulcanBossCards = CardsDB.gods.filter { $0.name != "Kukulcan" }
+        let firstThree = Array(nonKukulcanBossCards.shuffled().prefix(totalActs)).map { card in
+            (card: card, type: bossType(for: card))
+        }
+        let kukulcanCard = CardsDB.gods.first(where: { $0.name == "Kukulcan" }) ?? CardsDB.gods[0]
+        return firstThree + [(card: kukulcanCard, type: .kukulkan)]
+    }
+
+    private func nextBoss(after bossesDefeated: Int) -> (card: Card, type: BossType) {
+        if bossSequence.isEmpty {
+            bossSequence = buildBossSequence()
+        }
+        let index = min(max(0, bossesDefeated), max(0, bossSequence.count - 1))
+        return bossSequence[index]
+    }
+
+    private func bossType(for card: Card) -> BossType {
+        let loweredName = card.name.lowercased()
+        if loweredName.contains("chaac") {
+            return .chaac
+        }
+        if loweredName.contains("ah puch") || loweredName.contains("ahpuch") {
+            return .ahPuch
+        }
+        return Bool.random() ? .ahPuch : .chaac
     }
 
     private func buildCombatRewards(for player: PlayerRunState, includeBonusCard: Bool = false) -> [Reward] {
